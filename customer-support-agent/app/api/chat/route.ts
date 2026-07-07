@@ -312,7 +312,17 @@ function parseJSON(text: string) {
     .replace(/```\s*$/, "")
     .trim();
   const match = stripped.match(/\{[\s\S]*\}/);
-  return JSON.parse(match ? match[0] : stripped);
+  if (match) return JSON.parse(match[0]);
+
+  // Claude responded in plain text (no JSON found) — wrap it into the expected schema
+  return {
+    thinking: "Claude responded in plain text — wrapped as fallback.",
+    response: text.trim(),
+    user_mood: "neutral",
+    suggested_questions: [],
+    redirect_to_agent: { should_redirect: false },
+    debug: { context_used: false },
+  };
 }
 
 // ── 7. Agentic loop ───────────────────────────────────────────────────────────

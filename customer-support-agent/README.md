@@ -3,6 +3,12 @@
 
 ---
 
+> **Workshop focus:** Everything you need to build is in `app/api/chat/route.ts` and a handful of new files you create during the sessions. The frontend, database, Docker infrastructure, and backoffice UI are **already set up and running** — they exist to make the agent feel real, not to be studied. You don't need to understand or modify them.
+>
+> The sections on Architecture, SSE, Database, and File Reference are **informational only** — context for the curious. The workbook (`WORKSHOP_STEPS.md`) is where the hands-on work happens.
+
+---
+
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
