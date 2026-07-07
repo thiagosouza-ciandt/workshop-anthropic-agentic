@@ -22,7 +22,7 @@
 
 ## 1. Project Overview
 
-CorpBank is a fictional bank customer support system built to demonstrate **multi-agent AI patterns** using Claude via Amazon Bedrock. The system allows a customer to chat with an AI agent that can query real data, handle loan requests, search internal policy documents, and transfer the conversation to a human agent when needed — all in real time.
+CorpBank is a fictional bank customer support system built to demonstrate **multi-agent AI patterns** using Claude via Amazon Bedrock. The system allows a customer to chat with an AI agent that can query real data, handle loan requests, search internal policy documents, and transfer the conversation to a human agent when needed — all in real time. All these lessons would be able to practice following this [Workbook](WORKSHOP_STEPS.md)
 
 ### What participants will learn
 
@@ -433,10 +433,4 @@ customer-support-agent/
 ├── WORKSHOP.md                    ← Conceptual reference (what & why)
 ├── WORKSHOP_STEPS.md              ← Step-by-step guide (copy-paste workbook)
 │
-└── workshop/
-    ├── step1-base-agent/          ← Reference implementation + instructor guide
-    ├── step2-tool-calling/        ← Reference implementation + code blocks
-    ├── step3-subagents/           ← Agent files + coordinator
-    ├── step4-backoffice/          ← SSE, handoff, backoffice page
-    └── step5-mcp/                 ← MCP client + guide
 ```
