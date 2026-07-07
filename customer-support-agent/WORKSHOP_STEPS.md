@@ -4,28 +4,40 @@
 
 ---
 
+## Overview
+
+| Step | Duration | What you build |
+|---|---|---|
+| 1 — Base Agent | 20 min | System prompt, structured output, Bedrock client |
+| 2 — Tool Calling | 30 min | DB helpers, tool definitions, agentic loop |
+| 3 — Subagents | 30 min | Coordinator + 3 specialist agents |
+| 4 — Backoffice + SSE | 40 min | Real-time handoff, human-in-the-loop |
+| 5 — MCP | 20 min | Internal document search via MCP filesystem |
+
+---
+
 ## How this works
 
-You will work in **one file** throughout the workshop:
+You will work in **one file** for Steps 1–2:
 
 ```
 app/api/chat/route.ts
 ```
 
-Each step adds new blocks of code to this file. You copy, paste, save, and test immediately in the browser. No restarts needed — Next.js hot-reloads automatically.
+Each step adds new blocks of code. You copy, paste, save, and test immediately in the browser. No restarts needed — Next.js hot-reloads automatically.
+
+Steps 3–5 also create new files — the guide tells you exactly where.
 
 ---
 
 ## Test customers
 
-Use these to test at any step:
-
-| Name | Phone |
-|---|---|
-| Alice Johnson | +1-555-0101 |
-| Bob Smith | +1-555-0102 |
-| Carol Martinez | +1-555-0103 |
-| David Lee | +1-555-0104 |
+| Name | Phone | Credit Limit | Good for testing |
+|---|---|---|---|
+| Alice Johnson | +1-555-0101 | $2,000 | Large loans, open bills |
+| Bob Smith | +1-555-0102 | $500 | Overdue bills, low limit |
+| Carol Martinez | +1-555-0103 | $10,000 | VIP, everything paid |
+| David Lee | +1-555-0104 | $300 | Loan denials (credit limit) |
 
 ---
 
@@ -313,8 +325,12 @@ RULES:
 1. When the customer provides their name and phone number, call identify_customer immediately.
    Providing name and phone is sufficient — do not ask them to log in anywhere.
 2. Use tools to answer questions about financial data — never make up numbers.
-3. Loans up to $500 are approved automatically. Above that, inform the customer
-   it requires human approval and use request_loan anyway to register the request.
+3. For loan requests — follow this sequence:
+   a. Call get_credit to check the customer's credit limit.
+   b. If amount > credit_limit_usd: deny politely, offer escalation to human for an exception.
+   c. If amount ≤ credit_limit_usd AND ≤ $500: call request_loan — auto-approved.
+   d. If amount ≤ credit_limit_usd AND > $500: call request_loan (pending), ask for
+      confirmation to transfer to a human agent.
 
 IMPORTANT: Always respond as a valid JSON object:
 {
@@ -381,8 +397,9 @@ The agent now returns **real data** from the database.
 
 **Try also:**
 - `"Do I have any open bills? Bob Smith, +1-555-0102"` — Bob has overdue bills
-- `"I want a $300 loan. David Lee, +1-555-0104"` — auto-approved (≤ $500)
-- `"I want a $800 loan. Alice Johnson, +1-555-0101"` — pending (> $500)
+- `"I want a $200 loan. David Lee, +1-555-0104"` — auto-approved (within $300 limit, ≤ $500)
+- `"I want a $400 loan. David Lee, +1-555-0104"` — **denied** (above $300 credit limit)
+- `"I want a $800 loan. Alice Johnson, +1-555-0101"` — pending (within $2k limit, > $500)
 
 ---
 
@@ -1135,6 +1152,215 @@ No polling. No refresh. The server pushes events as they happen.
 
 ---
 
+---
+
+---
+
+# STEP 5 — MCP: Internal Document Search
+
+**Duration:** 20 minutes
+
+**What you'll learn:** What MCP is, how to connect an agent to a local document server, and why MCP matters as a standard protocol for AI integrations.
+
+---
+
+## 5.1 — What is MCP?
+
+**Model Context Protocol** is an open standard for connecting AI agents to external data sources. Instead of building a custom fetch integration for each data source, you connect to an MCP server — and the same agent code works with Google Drive, Notion, GitHub, databases, and more.
+
+```
+Without MCP:  Agent → custom fetch() → your API → data
+With MCP:     Agent → MCP client → MCP server → any data source
+```
+
+In this step, the agent gains the ability to search CorpBank's internal policy documents. When a customer asks "what's the interest rate?", instead of making something up, the agent searches the real documentation.
+
+---
+
+## 5.2 — Install the MCP SDK
+
+```bash
+npm install @modelcontextprotocol/sdk
+```
+
+---
+
+## 5.3 — Create `app/lib/mcp-docs.ts`
+
+This file creates an MCP client that spawns the filesystem server as a subprocess:
+
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import path from "path";
+
+const DOCS_PATH = path.join(process.cwd(), "docs");
+
+// Keep a single client alive across requests (stored in globalThis)
+const g = globalThis as any;
+
+async function getMcpClient(): Promise<Client> {
+  if (g.__mcp_docs_client) return g.__mcp_docs_client;
+
+  const transport = new StdioClientTransport({
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem", DOCS_PATH],
+  });
+
+  const client = new Client({ name: "corpbank-docs", version: "1.0.0" });
+  await client.connect(transport);
+
+  g.__mcp_docs_client = client;
+  return client;
+}
+
+export async function searchDocs(query: string): Promise<string> {
+  try {
+    const client = await getMcpClient();
+
+    // List all files the MCP server exposes
+    const { resources } = await client.listResources();
+
+    const results: { file: string; excerpt: string }[] = [];
+    const queryLower = query.toLowerCase();
+
+    for (const resource of resources) {
+      const { contents } = await client.readResource({ uri: resource.uri });
+      for (const content of contents) {
+        if (content.type !== "text") continue;
+        const text = content.text as string;
+        if (text.toLowerCase().includes(queryLower)) {
+          const lines = text.split("\n");
+          const matchingLines = lines.filter(l => l.toLowerCase().includes(queryLower));
+          results.push({
+            file: resource.name ?? resource.uri,
+            excerpt: matchingLines.slice(0, 3).join(" ").trim(),
+          });
+        }
+      }
+    }
+
+    if (results.length === 0) {
+      return JSON.stringify({ found: false, message: `No documents found matching: "${query}"` });
+    }
+
+    return JSON.stringify({ found: true, results });
+  } catch (err: any) {
+    return JSON.stringify({ error: err.message });
+  }
+}
+```
+
+---
+
+## 5.4 — Add import to `route.ts`
+
+At the top of `app/api/chat/route.ts`, after the existing imports:
+
+```typescript
+import { searchDocs } from "@/app/lib/mcp-docs";
+```
+
+---
+
+## 5.5 — Add the tool definition
+
+Inside the `tools` array, before `escalate_to_human`:
+
+```typescript
+{
+  name: "search_docs",
+  description:
+    "Searches CorpBank's internal policy documents. Use when the customer asks about rates, fees, policies, eligibility, products, or any question that requires official documentation rather than live account data.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      query: { type: "string", description: "Keywords to search, e.g. 'loan interest rate'" },
+    },
+    required: ["query"],
+  },
+},
+```
+
+---
+
+## 5.6 — Add the executor case
+
+Inside `executeTool`, before the `escalate_to_human` case:
+
+```typescript
+case "search_docs":
+  result = await searchDocs(input.query);
+  break;
+```
+
+---
+
+## 5.7 — Update the system prompt
+
+Add `search_docs` to the tool list in `SYSTEM_PROMPT`:
+
+```
+- search_docs: search CorpBank policy documents (rates, fees, eligibility, products)
+```
+
+---
+
+## 5.8 — Look at the documents
+
+Open the `docs/` folder. Four markdown files:
+
+| File | Content |
+|---|---|
+| `loan-policy.md` | Interest rates, repayment, eligibility, exceptions |
+| `credit-limit-policy.md` | Default limits, increase process, automatic reviews |
+| `faq.md` | Common customer questions with answers |
+| `products.md` | Account types, support channels |
+
+These are the files the MCP server exposes. In production, these could be in Google Drive, Notion, or any other source with an MCP server.
+
+---
+
+## 5.9 — Test
+
+Send these messages (no need to identify yourself for policy questions):
+
+```
+What's the interest rate for a $1,000 loan?
+```
+
+**Watch the terminal:**
+```
+🔧 Tool call: search_docs { query: 'interest rate 1000 loan' }
+✅ Tool result: search_docs {"found":true,"results":[{"file":"loan-policy.md","excerpt":"$501 – $2,000 | Up to 24 months | 11.0%"}]}
+```
+
+Try also:
+```
+How can I increase my credit limit?
+What happens if I miss a payment?
+What accounts does CorpBank offer?
+```
+
+---
+
+## Discussion: MCP transport types
+
+| Transport | When to use |
+|---|---|
+| **stdio** | Local servers (filesystem, local DB) — subprocess spawned by the agent |
+| **HTTP + SSE** | Remote servers (Google Drive, Notion, shared company knowledge base) |
+
+In this step we used stdio. To connect to a remote MCP server (e.g., Google Drive), you would change only the transport — the `client.listResources()` and `client.readResource()` calls stay identical.
+
+---
+
+## Discussion: Why MCP instead of a direct fetch?
+
+If you built a direct integration with Google Drive, you would write OAuth2 flows, handle pagination, parse Drive's API response format, and maintain the code as the API changes. With MCP, a community-maintained server handles all of that — you just connect and call `listResources`.
+
+---
+
 # Congratulations
 
 You have built a complete multi-agent customer support system with:
@@ -1147,6 +1373,7 @@ You have built a complete multi-agent customer support system with:
 | Specialist delegation | Coordinator + subagents |
 | Human escalation with context | `escalate_to_human` tool + handoff flow |
 | Real-time communication | SSE (EventSource + publish/subscribe) |
+| Internal document search | MCP filesystem server + `search_docs` tool |
 | Prompt injection prevention | Customer ID validated server-side + regex allowlist |
 | Endpoint protection | Shared secret on backoffice endpoints |
 
@@ -1166,5 +1393,8 @@ Zod validates that Claude always returns the expected format. If it doesn't, the
 **4. SSE is simpler than WebSocket for push**
 For server-to-client events, SSE is native in browsers, requires no library, and is stateless on reconnect. Reserve WebSocket for bidirectional real-time (e.g., collaborative editing).
 
-**5. Never trust the client**
+**5. MCP standardizes integrations**
+Instead of writing a custom integration for every data source, MCP gives you one interface that works with any server. Change the transport (stdio → HTTP), not the agent code.
+
+**6. Never trust the client**
 Customer ID, agent identity (`from`, `resolved_by`), and session state are all derived server-side. The client can only supply what it cannot abuse.

@@ -15,6 +15,7 @@ import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { z } from "zod";
 import crypto from "crypto";
 import { publish, getConvCustomer, setConvCustomer } from "@/app/lib/sse-store";
+import { searchDocs } from "@/app/lib/mcp-docs";
 
 // Allowlist for customer IDs — must match DB pattern to prevent prompt injection
 const CUSTOMER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -144,6 +145,18 @@ const tools: Parameters<InstanceType<typeof AnthropicBedrock>["messages"]["creat
     },
   },
   {
+    name: "search_docs",
+    description:
+      "Searches CorpBank's internal policy documents. Use when the customer asks about rates, fees, policies, eligibility, products, or any question that requires official documentation rather than live account data.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Keywords to search for, e.g. 'loan interest rate' or 'credit limit increase'" },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "escalate_to_human",
     description:
       "Transfers the conversation to a human agent. Use in two cases: (1) loan above $500 after customer confirms transfer, or (2) customer is clearly frustrated and demands a human immediately. Do NOT use for credit limit increases, complaints, disputes, or routine questions.",
@@ -204,6 +217,10 @@ async function executeTool(name: string, input: any): Promise<string> {
         });
         break;
 
+      case "search_docs":
+        result = await searchDocs(input.query);
+        break;
+
       case "escalate_to_human":
         // Handled in the main handler after the loop — signal back to POST
         result = { escalated: true, ...input };
@@ -240,7 +257,7 @@ const responseSchema = z.object({
 const SYSTEM_PROMPT = `You are a virtual customer support assistant for CorpBank.
 Be friendly, clear, and concise. Always reply in English.
 
-You have access to tools to query real customer data:
+You have access to tools to query real customer data and internal documents:
 - identify_customer: identify the customer by name + phone
 - get_customer: customer profile by ID
 - get_accounts: all account balances
@@ -248,19 +265,29 @@ You have access to tools to query real customer data:
 - get_transactions: account statement
 - get_credit: credit limit and availability
 - request_loan: submit a loan request
+- search_docs: search CorpBank policy documents (rates, fees, eligibility, products)
 - escalate_to_human: transfer the conversation to a human agent
 
 RULES:
 1. When the customer provides their name and phone number, call identify_customer immediately.
    Providing name and phone is sufficient — do not ask them to log in anywhere.
 2. Use tools to answer questions about financial data — never make up numbers.
-3. For loan requests above $500:
-   a. Call request_loan to register it.
-   b. Inform the customer the amount requires human approval.
-   c. Ask: "Would you like me to transfer you to a human agent now?"
-   d. Only if the customer confirms — call escalate_to_human.
+3. For loan requests — follow this sequence exactly:
+   a. Call get_credit to check the customer's credit limit.
+   b. If the requested amount exceeds credit_limit_usd:
+      - Do NOT call request_loan.
+      - Politely decline: explain the amount is above their credit limit.
+      - Offer to escalate to a human agent who can review an exception.
+      - If the customer confirms escalation → call escalate_to_human (without a loan_id).
+   c. If the requested amount is within credit_limit_usd AND above $500:
+      - Call request_loan to register it as pending.
+      - Inform the customer it requires human approval.
+      - Ask if they want to be transferred now.
+      - If confirmed → call escalate_to_human with the loan_id.
+   d. If the requested amount is within credit_limit_usd AND $500 or below:
+      - Call request_loan — it will be approved automatically.
 4. You may escalate to a human in two situations only:
-   a. Loan requests above $500 — after registering with request_loan and customer confirms.
+   a. Loan requests — as described in rule 3 above.
    b. Customer expresses strong frustration and explicitly demands to speak with a human
       immediately — escalate right away without asking for further confirmation.
 5. For everything else that requires approval (credit limit increases, disputes, complaints,
