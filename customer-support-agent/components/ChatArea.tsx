@@ -242,7 +242,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           </Avatar>
           <div>
             <h3 className="text-sm font-medium leading-none">AI Agent</h3>
-            <p className="text-sm text-muted-foreground">Customer support</p>
+            <p className="text-sm text-muted-foreground">Research Agent</p>
           </div>
         </>
       )}
@@ -298,12 +298,45 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
 );
 
 function ChatArea() {
+  const conversationIdRef = useRef(crypto.randomUUID());
+  const conversationId = conversationIdRef.current;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showHeader, setShowHeader] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("claude-haiku-4-5-20251001");
+  const [selectedModel, setSelectedModel] = useState("us.anthropic.claude-opus-4-8");
   const [showAvatar, setShowAvatar] = useState(false);
+  // When true, messages go directly to the human agent — not to the AI
+  const [handoffMode, setHandoffMode] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Restore session from sessionStorage after hydration (client-only)
+  useEffect(() => {
+    const savedId   = sessionStorage.getItem("corpbank_conversation_id");
+    const savedMsgs = sessionStorage.getItem("corpbank_messages");
+    const savedMode = sessionStorage.getItem("corpbank_handoff_mode");
+
+    // Use stored conversationId if it exists, otherwise persist the new one
+    if (savedId) {
+      conversationIdRef.current = savedId;
+    } else {
+      sessionStorage.setItem("corpbank_conversation_id", conversationIdRef.current);
+    }
+
+    if (savedMsgs) {
+      try {
+        const msgs = JSON.parse(savedMsgs);
+        if (msgs.length > 0) {
+          setMessages(msgs);
+          setShowHeader(true);
+          setShowAvatar(true);
+        }
+      } catch {}
+    }
+    if (savedMode === "true") setHandoffMode(true);
+    setHydrated(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState(
@@ -316,10 +349,18 @@ function ChatArea() {
   ];
 
   const models: Model[] = [
-    { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku" },
-    { id: "claude-haiku-4-5-20251001", name: "Claude 4.5 Haiku" },
-    { id: "claude-3-5-sonnet-20240620", name: "Claude 3.5 Sonnet" },
+    { id: "us.anthropic.claude-opus-4-8", name: "Claude Opus 4.8" },
+    { id: "us.anthropic.claude-haiku-4-5-20251001-v1:0", name: "Claude Haiku 4.5" },
   ];
+
+  // Persist messages and handoff state across hot reloads
+  useEffect(() => {
+    try { sessionStorage.setItem("corpbank_messages", JSON.stringify(messages)); } catch {}
+  }, [messages]);
+
+  useEffect(() => {
+    sessionStorage.setItem("corpbank_handoff_mode", String(handoffMode));
+  }, [handoffMode]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -383,6 +424,50 @@ function ChatArea() {
     }
   }, []);
 
+  // ── SSE: receive events from the backoffice ───────────────────────────────────
+  useEffect(() => {
+    const es = new EventSource(`/api/stream?channel=${conversationId}`);
+
+    const addMsg = (response: string, opts: object = {}) =>
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: JSON.stringify({
+          response,
+          thinking: "",
+          user_mood: "neutral",
+          suggested_questions: [],
+          redirect_to_agent: { should_redirect: false },
+          debug: { context_used: false },
+          ...opts,
+        }),
+      }]);
+
+    es.addEventListener("human_message", (e) => {
+      const { message, from } = JSON.parse(e.data);
+      addMsg(`**[${from}]** ${message}`);
+    });
+
+    es.addEventListener("loan_resolved", (e) => {
+      const { decision, reason, amount } = JSON.parse(e.data);
+      const amountStr = amount ? ` Amount approved: **$${Number(amount).toLocaleString()}**.` : "";
+      addMsg(
+        `Your request has been **${decision}**.${amountStr}${reason ? ` Reason: ${reason}` : ""}`,
+        { user_mood: decision === "approved" ? "positive" : "negative" }
+      );
+      setHandoffMode(false);
+    });
+
+    es.addEventListener("agent_returned", () => {
+      addMsg("You've been transferred back to the AI assistant. How can I help you?");
+      setHandoffMode(false);
+    });
+
+    es.onerror = () => console.warn("SSE: reconnecting...");
+    return () => es.close();
+  }, [conversationId]);
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const decodeDebugData = (response: Response) => {
     const debugData = response.headers.get("X-Debug-Data");
     if (debugData) {
@@ -407,6 +492,27 @@ function ChatArea() {
     }
     if (!showHeader) setShowHeader(true);
     if (!showAvatar) setShowAvatar(true);
+
+    const text = typeof event === "string" ? event : input;
+
+    // ── Handoff mode: forward message to human agent, skip AI ─────────────────
+    if (handoffMode) {
+      if (!text.trim()) return;
+      setInput("");
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: text,
+      }]);
+      await fetch("/api/handoff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "customer_reply", conversation_id: conversationId, message: text }),
+      });
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     setIsLoading(true);
 
     const clientStart = performance.now();
@@ -415,7 +521,7 @@ function ChatArea() {
     const userMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      content: typeof event === "string" ? event : input,
+      content: text,
     };
 
     const placeholderMessage = {
@@ -450,7 +556,7 @@ function ChatArea() {
         body: JSON.stringify({
           messages: [...messages, userMessage],
           model: selectedModel,
-          knowledgeBaseId: selectedKnowledgeBase,
+          conversationId,
         }),
       });
 
@@ -465,6 +571,7 @@ function ChatArea() {
       }
 
       const data = await response.json();
+
       const endTime = performance.now();
       logDuration("JSON Parse Duration", endTime - responseReceived);
       logDuration("Total API Duration", endTime - startTime);
@@ -521,6 +628,9 @@ function ChatArea() {
       });
       window.dispatchEvent(sidebarEvent);
 
+      // Enter handoff mode — subsequent messages go to the human agent
+      if (data.handoff_initiated) setHandoffMode(true);
+
       if (data.redirect_to_agent && data.redirect_to_agent.should_redirect) {
         window.dispatchEvent(
           new CustomEvent("agentRedirectRequested", {
@@ -572,18 +682,37 @@ function ChatArea() {
       window.removeEventListener("toolExecution", handleToolExecution);
   }, []);
 
+  const handleNewSession = () => {
+    sessionStorage.removeItem("corpbank_conversation_id");
+    sessionStorage.removeItem("corpbank_messages");
+    sessionStorage.removeItem("corpbank_handoff_mode");
+    window.location.reload();
+  };
+
   return (
     <Card className="flex-1 flex flex-col mb-4 mr-4 ml-4">
       <CardContent className="flex-1 flex flex-col overflow-hidden pt-4 px-4 pb-0">
-        <ConversationHeader
-          selectedModel={selectedModel}
-          setSelectedModel={setSelectedModel}
-          models={models}
-          showAvatar={showAvatar}
-          selectedKnowledgeBase={selectedKnowledgeBase}
-          setSelectedKnowledgeBase={setSelectedKnowledgeBase}
-          knowledgeBases={knowledgeBases}
-        />
+        <div className="flex items-start gap-2 pb-2">
+          <div className="flex-1 min-w-0">
+            <ConversationHeader
+              selectedModel={selectedModel}
+              setSelectedModel={setSelectedModel}
+              models={models}
+              showAvatar={showAvatar}
+              selectedKnowledgeBase={selectedKnowledgeBase}
+              setSelectedKnowledgeBase={setSelectedKnowledgeBase}
+              knowledgeBases={knowledgeBases}
+            />
+          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={handleNewSession}
+              className="text-xs text-muted-foreground border rounded px-2 py-1 hover:bg-muted whitespace-nowrap mt-1 shrink-0"
+            >
+              New session
+            </button>
+          )}
+        </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full animate-fade-in-up">
@@ -676,7 +805,35 @@ function ChatArea() {
         </div>
       </CardContent>
 
-      <CardFooter className="p-4 pt-0">
+      <CardFooter className="p-4 pt-0 flex-col gap-2">
+        {handoffMode && (
+          <div className="w-full flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-sm">
+            <span className="text-orange-700 font-medium">🧑‍💼 Connected to a human agent</span>
+            <button
+              type="button"
+              onClick={async () => {
+                await fetch("/api/handoff", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "customer_reply", conversation_id: conversationId, message: "__return_to_agent__" }),
+                });
+                setHandoffMode(false);
+                setMessages((prev) => [...prev, {
+                  id: crypto.randomUUID(),
+                  role: "assistant",
+                  content: JSON.stringify({
+                    response: "You've been transferred back to the AI assistant.",
+                    thinking: "", user_mood: "neutral", suggested_questions: [],
+                    redirect_to_agent: { should_redirect: false }, debug: { context_used: false },
+                  }),
+                }]);
+              }}
+              className="text-xs text-orange-600 underline hover:text-orange-800"
+            >
+              Return to AI agent
+            </button>
+          </div>
+        )}
         <form
           onSubmit={handleSubmit}
           className="flex flex-col w-full relative bg-background border rounded-xl focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
@@ -685,7 +842,7 @@ function ChatArea() {
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message here..."
+            placeholder={handoffMode ? "Message human agent..." : "Type your message here..."}
             disabled={isLoading}
             className="resize-none min-h-[44px] bg-background  border-0 p-3 rounded-xl shadow-none focus-visible:ring-0"
             rows={1}

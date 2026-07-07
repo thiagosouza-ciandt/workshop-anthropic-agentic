@@ -12,15 +12,10 @@
 // ============================================================
 
 import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
+// Types are referenced via the AnthropicBedrock namespace below (e.g. AnthropicBedrock.Tool).
+// This works at runtime inside Next.js — the IDE may show false positives for this pattern.
 import { z } from "zod";
 import crypto from "crypto";
-import { publish, getConvCustomer, setConvCustomer } from "@/app/lib/sse-store";
-
-// Allowlist for customer IDs — must match DB pattern to prevent prompt injection
-const CUSTOMER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-
-type MessageParam = Parameters<InstanceType<typeof AnthropicBedrock>["messages"]["create"]>[0]["messages"][number];
-type ToolResultBlockParam = { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
 
 const anthropic = new AnthropicBedrock({
   awsRegion: process.env.AWS_REGION ?? "us-east-1",
@@ -50,7 +45,7 @@ async function dbPost(path: string, body: object) {
 //   • name: identifier that Claude uses to call it
 //   • description: Claude reads this to decide WHEN to use the tool
 //   • input_schema: the parameters Claude must pass
-const tools: Parameters<InstanceType<typeof AnthropicBedrock>["messages"]["create"]>[0]["tools"] = [
+const tools: AnthropicBedrock.Tool[] = [
   // ── STEP 2: identification tool ──────────────────────────────────────────────
   // Call this tool as soon as the customer provides their name and phone number.
   // It returns the customer_id that the other tools need.
@@ -143,21 +138,6 @@ const tools: Parameters<InstanceType<typeof AnthropicBedrock>["messages"]["creat
       required: ["customer_id", "amount"],
     },
   },
-  {
-    name: "escalate_to_human",
-    description:
-      "Transfers the conversation to a human agent. Use in two cases: (1) loan above $500 after customer confirms transfer, or (2) customer is clearly frustrated and demands a human immediately. Do NOT use for credit limit increases, complaints, disputes, or routine questions.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        customer_id: { type: "string" },
-        customer_name: { type: "string" },
-        reason: { type: "string", description: "Why the handoff is needed" },
-        loan_id: { type: "string", description: "Loan ID if this is a loan escalation" },
-      },
-      required: ["customer_id", "customer_name", "reason"],
-    },
-  },
 ];
 
 // ── 3. Tool Executor ──────────────────────────────────────────────────────────
@@ -193,20 +173,11 @@ async function executeTool(name: string, input: any): Promise<string> {
         result = await db(`/transactions/${input.account_id}?limit=${limit}`);
         break;
 
-      case "get_credit":
-        result = await db(`/credit/${input.customer_id}`);
-        break;
-
       case "request_loan":
         result = await dbPost("/loans", {
           customer_id: input.customer_id,
           amount: input.amount,
         });
-        break;
-
-      case "escalate_to_human":
-        // Handled in the main handler after the loop — signal back to POST
-        result = { escalated: true, ...input };
         break;
 
       default:
@@ -233,7 +204,6 @@ const responseSchema = z.object({
     reason: z.string().optional(),
   }),
   debug: z.object({ context_used: z.boolean() }),
-  handoff_initiated: z.boolean().optional(),
 });
 
 // ── 5. System prompt ──────────────────────────────────────────────────────────
@@ -246,27 +216,15 @@ You have access to tools to query real customer data:
 - get_accounts: all account balances
 - get_bills: bills and invoices (open or paid)
 - get_transactions: account statement
-- get_credit: credit limit and availability
 - request_loan: submit a loan request
-- escalate_to_human: transfer the conversation to a human agent
 
 RULES:
 1. When the customer provides their name and phone number, call identify_customer immediately.
    Providing name and phone is sufficient — do not ask them to log in anywhere.
 2. Use tools to answer questions about financial data — never make up numbers.
-3. For loan requests above $500:
-   a. Call request_loan to register it.
-   b. Inform the customer the amount requires human approval.
-   c. Ask: "Would you like me to transfer you to a human agent now?"
-   d. Only if the customer confirms — call escalate_to_human.
-4. You may escalate to a human in two situations only:
-   a. Loan requests above $500 — after registering with request_loan and customer confirms.
-   b. Customer expresses strong frustration and explicitly demands to speak with a human
-      immediately — escalate right away without asking for further confirmation.
-5. For everything else that requires approval (credit limit increases, disputes, complaints,
-   account changes), respond politely that you do not have the authority to handle that,
-   and suggest the customer visit a branch or call the support line.
-6. Never call escalate_to_human for routine questions or topics you can answer yourself.
+3. Loans up to $500 are approved by you automatically. Above that, inform the customer
+   it requires human approval and use request_loan anyway to register the request.
+4. If the customer asks to speak with a human, signal redirect_to_agent.
 
 IMPORTANT: Always respond as a valid JSON object:
 {
@@ -289,55 +247,45 @@ function parseJSON(text: string) {
 }
 
 // ── 7. Agentic loop ───────────────────────────────────────────────────────────
-type LoopResult = { text: string; escalation: any | null; customerId: string | null };
-
+// This is the main difference compared to Step 1.
+// The loop continues as long as Claude wants to call tools.
+// It only ends when stop_reason === "end_turn".
 async function runAgentLoop(
-  messages: MessageParam[],
+  messages: AnthropicBedrock.MessageParam[],
   model: string,
-  knownCustomerId: string | null,
-): Promise<LoopResult> {
+): Promise<string> {
   let currentMessages = [...messages];
-  let escalation: any | null = null;
-  let customerId: string | null = knownCustomerId;
 
   while (true) {
     const response = await anthropic.messages.create({
       model,
       max_tokens: 4096,
-      system: knownCustomerId && CUSTOMER_ID_RE.test(knownCustomerId)
-        ? SYSTEM_PROMPT + `\n\nCustomer already identified: ${knownCustomerId}. Do NOT call identify_customer again.`
-        : SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT,
       tools,
       messages: currentMessages,
     });
 
+    // Claude finished — return the final text
     if (response.stop_reason === "end_turn") {
-      const text = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
+      return response.content
+        .filter((b): b is AnthropicBedrock.TextBlock => b.type === "text")
+        .map((b) => b.text)
         .join(" ");
-      return { text, escalation, customerId };
     }
 
+    // Claude wants to call tools
     if (response.stop_reason === "tool_use") {
+      // Add Claude's response (with tool_use blocks) to the history
       currentMessages.push({ role: "assistant", content: response.content });
 
-      const toolResults: ToolResultBlockParam[] = [];
+      // Execute each tool called by Claude
+      const toolResults: AnthropicBedrock.ToolResultBlockParam[] = [];
       for (const block of response.content) {
         if (block.type !== "tool_use") continue;
 
         console.log(`🔧 Tool call: ${block.name}`, block.input);
         const result = await executeTool(block.name, block.input);
         console.log(`✅ Tool result: ${block.name}`, result.slice(0, 200));
-
-        // Capture customer_id when identified so we can return it to the frontend
-        if (block.name === "identify_customer") {
-          try { customerId = JSON.parse(result)?.id ?? customerId; } catch {}
-        }
-
-        if (block.name === "escalate_to_human") {
-          escalation = block.input;
-        }
 
         toolResults.push({
           type: "tool_result",
@@ -346,6 +294,7 @@ async function runAgentLoop(
         });
       }
 
+      // Return the tool results to Claude to continue
       currentMessages.push({ role: "user", content: toolResults });
     }
   }
@@ -353,85 +302,22 @@ async function runAgentLoop(
 
 // ── 8. Main Handler ───────────────────────────────────────────────────────────
 export async function POST(req: Request) {
-  const { messages, model, conversationId = crypto.randomUUID() } = await req.json();
-  // Never trust customerId from the client — look it up server-side by conversationId
-  const customerId = getConvCustomer(conversationId);
+  const { messages, model } = await req.json();
 
-  const anthropicMessages: MessageParam[] = messages.map(
+  const anthropicMessages: AnthropicBedrock.MessageParam[] = messages.map(
     (msg: any) => ({ role: msg.role, content: msg.content }),
   );
 
   try {
-    const { text, escalation, customerId: resolvedCustomerId } = await runAgentLoop(
+    const text = await runAgentLoop(
       anthropicMessages,
       model ?? "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-      customerId,
     );
-
-    // Persist newly resolved customerId server-side for subsequent requests
-    if (resolvedCustomerId && !customerId) {
-      setConvCustomer(conversationId, resolvedCustomerId);
-    }
 
     const parsed = parseJSON(text);
     const validated = responseSchema.parse(parsed);
 
-    // ── Handoff: create in DB and notify backoffice via SSE ──────────────────
-    if (escalation) {
-      // Deduplicate: skip if a waiting/claimed handoff already exists for this conversation
-      const existing = await fetch(`${CORPDB_URL}/handoffs?status=waiting`)
-        .then((r) => r.ok ? r.json() : []).catch(() => []);
-      const alreadyOpen = existing.some((h: any) => h.conversation_id === conversationId);
-      if (alreadyOpen) {
-        console.log(`⚠️ Handoff already open for ${conversationId} — skipping duplicate`);
-        return Response.json({
-          id: crypto.randomUUID(),
-          conversation_id: conversationId,
-          customer_id: resolvedCustomerId,
-          handoff_initiated: true,
-          ...validated,
-        });
-      }
-
-      const customer = await fetch(`${CORPDB_URL}/customers/${escalation.customer_id}`)
-        .then((r) => r.ok ? r.json() : null).catch(() => null);
-
-      const handoff = await dbPost("/handoffs", {
-        conversation_id: conversationId,
-        customer_id: escalation.customer_id,
-        loan_id: escalation.loan_id ?? null,
-        context: {
-          messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
-          agent_reasoning: escalation.reason,
-          customer_summary: customer
-            ? `${customer.name} | Credit limit: $${customer.credit_limit_usd}`
-            : escalation.customer_name ?? "Unknown customer",
-        },
-      });
-
-      publish("*", {
-        type: "handoff_created",
-        payload: {
-          handoff_id: handoff.id,
-          conversation_id: conversationId,
-          customer_id: escalation.customer_id,
-          customer_name: escalation.customer_name ?? customer?.name ?? "Unknown",
-          loan_id: escalation.loan_id ?? "",
-          amount: 0,
-          context: handoff.context ?? {},
-        },
-      });
-
-      console.log(`🚨 Handoff created: ${handoff.id}`);
-    }
-
-    return Response.json({
-      id: crypto.randomUUID(),
-      conversation_id: conversationId,
-      customer_id: resolvedCustomerId,
-      handoff_initiated: !!escalation,
-      ...validated,
-    });
+    return Response.json({ id: crypto.randomUUID(), ...validated });
   } catch (error) {
     console.error("Agent error:", error);
     return Response.json(

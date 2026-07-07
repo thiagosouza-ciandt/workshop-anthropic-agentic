@@ -1,6 +1,6 @@
-# Claude Customer Support Agent
+# Claude Research Agent
 
-An advanced, fully customizable customer support chat interface powered by Claude and leveraging Amazon Bedrock Knowledge Bases for knowledge retrieval.
+An advanced, fully customizable research agent chat interface powered by Claude and leveraging Amazon Bedrock Knowledge Bases for knowledge retrieval.
 ![preview](tutorial/preview.png)
 
 ## Key Features

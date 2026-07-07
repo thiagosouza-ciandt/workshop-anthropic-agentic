@@ -1,0 +1,20 @@
+services:
+  sqlite-api:
+    build: ./sqlite-api
+    container_name: corpdb-api
+    ports:
+      - "3001:3001"
+    volumes:
+      - sqlite-data:/data
+    environment:
+      PORT: 3001
+      DB_PATH: /data/corpdb.sqlite
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  sqlite-data:
