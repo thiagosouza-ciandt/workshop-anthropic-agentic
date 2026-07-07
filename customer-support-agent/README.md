@@ -6,18 +6,17 @@
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
-2. [Architecture](#2-architecture)
-3. [What is a Router Agent?](#3-what-is-a-router-agent)
-4. [Tools](#4-tools)
-5. [The Agentic Loop](#5-the-agentic-loop)
-6. [Escalate to Human (Human-in-the-Loop)](#6-escalate-to-human-human-in-the-loop)
-7. [Real-Time Communication with SSE](#7-real-time-communication-with-sse)
+2. [Schedule](#2-schedule)
+3. [Architecture](#3-architecture)
+4. [What is a Router Agent?](#4-what-is-a-router-agent)
+5. [Tools](#5-tools)
+6. [The Agentic Loop](#6-the-agentic-loop)
+7. [Escalate to Human (Human-in-the-Loop)](#7-escalate-to-human-human-in-the-loop)
 8. [MCP — Internal Document Search](#8-mcp--internal-document-search)
 9. [Prompt Attack Prevention](#9-prompt-attack-prevention)
-10. [Workshop Steps](#10-workshop-steps)
-11. [Running the Project](#11-running-the-project)
-12. [Database & API Contract](#12-database--api-contract)
-13. [File Reference](#13-file-reference)
+10. [Running the Project](#10-running-the-project)
+11. [Database & API Contract](#11-database--api-contract)
+12. [File Reference](#12-file-reference)
 
 ---
 
@@ -49,7 +48,23 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 
 ---
 
-## 2. Architecture
+## 2. Schedule
+
+| Step | Duration | What you build | Anthropic concepts |
+|---|---|---|---|
+| 1 — Base Agent | 20 min | System prompt, structured output, Bedrock client | System prompt, structured output, Zod |
+| 2 — Tool Calling | 30 min | DB helpers, tool definitions, agentic loop | Tools, agentic loop, stop_reason |
+| 3 — Subagents | 30 min | Coordinator + 3 specialist agents | Multi-agent orchestration, delegation |
+| 4 — MCP | 20 min | Internal document search via MCP filesystem | Model Context Protocol |
+| 5 — Human-in-the-loop | 40 min | Real-time handoff, backoffice, SSE | Escalation patterns, human oversight |
+
+**Total: ~2h 20min**
+
+> Steps 1–4 focus on core Anthropic patterns. Step 5 adds the human oversight layer using SSE (a web standard, not Anthropic-specific).
+
+---
+
+## 3. Architecture
 
 ```
 Customer browser  ──────────────────────────────────► localhost:3000/
@@ -92,7 +107,7 @@ Backoffice browser ────────────────────�
 
 ---
 
-## 3. What is a Router Agent?
+## 4. What is a Router Agent?
 
 A **Router Agent** is an AI agent that acts as the single entry point for user requests. Instead of doing everything itself, it:
 
@@ -130,7 +145,7 @@ RULES:
 
 ---
 
-## 4. Tools
+## 5. Tools
 
 Tools are functions you expose to Claude. Claude reads the `name` and `description` and decides when to call them. You receive the call, execute the function, and return the result — Claude then continues.
 
@@ -175,7 +190,7 @@ The agent checks `get_credit` before processing any loan request:
 
 ---
 
-## 5. The Agentic Loop
+## 6. The Agentic Loop
 
 The agentic loop is the `while (true)` that keeps Claude working until it finishes. This is the core pattern of any tool-calling agent.
 
@@ -206,7 +221,7 @@ while (true) {
 
 ---
 
-## 6. Escalate to Human (Human-in-the-Loop)
+## 7. Escalate to Human (Human-in-the-Loop)
 
 When a loan requires human approval, a customer is frustrated, or an exception is requested, the agent transfers the full conversation to a human agent (a **handoff**).
 
@@ -232,30 +247,9 @@ Every handoff includes:
 - Customer summary (name, credit limit)
 - Loan ID and amount (pre-filled in the decision form)
 
----
+### Real-time delivery
 
-## 7. Real-Time Communication with SSE
-
-**Server-Sent Events (SSE)** is a one-directional HTTP protocol: the server keeps a connection open and pushes events to the browser. No polling, no WebSocket complexity.
-
-### Channels
-
-| Channel | Who listens | What it receives |
-|---|---|---|
-| `*` | Backoffice | All events from all conversations |
-| `<conversationId>` | Customer chat | Only events for this conversation |
-
-### Event types
-
-| Event | Direction | Trigger |
-|---|---|---|
-| `handoff_created` | Agent → Backoffice | Agent calls `escalate_to_human` |
-| `human_message` | Backoffice → Customer | Human types in live chat |
-| `customer_message` | Customer → Backoffice | Customer replies during handoff |
-| `loan_resolved` | Backoffice → Customer | Human approves or rejects |
-| `agent_returned` | Backoffice → Both | Human clicks "Return to AI" |
-
-> **Production note:** Replace the in-memory SSE store with Redis Pub/Sub. The `publish`/`subscribe` interface stays identical — only the implementation changes.
+Events between the agent, customer, and backoffice are pushed via **Server-Sent Events (SSE)** — a standard browser protocol where the server keeps a connection open and pushes events without polling. Not an Anthropic concept, but the mechanism that makes the handoff feel instant.
 
 ---
 
@@ -308,23 +302,7 @@ const { contents } = await client.readResource({ uri }); // read one doc
 
 ---
 
-## 10. Workshop Steps
-
-The workshop is structured as **5 incremental steps**. All work happens in one file — `app/api/chat/route.ts` — with new blocks added at each step.
-
-| Step | Duration | What it builds |
-|---|---|---|
-| 1 — Base Agent | 20 min | System prompt, Zod schema, Bedrock client |
-| 2 — Tool Calling | 30 min | DB helpers, tool definitions, agentic loop |
-| 3 — Subagents | 30 min | Coordinator + 3 specialist agents |
-| 4 — Backoffice + SSE | 40 min | Real-time handoff, human-in-the-loop |
-| 5 — MCP | 20 min | Internal document search via MCP filesystem |
-
-See `WORKSHOP_STEPS.md` for the full step-by-step guide with all code blocks ready to copy-paste.
-
----
-
-## 11. Running the Project
+## 10. Running the Project
 
 ### Prerequisites
 
@@ -386,7 +364,7 @@ npm run dev
 
 ---
 
-## 12. Database & API Contract
+## 11. Database & API Contract
 
 SQLite REST API (Docker, port 3001). Full contract: `infra/API_CONTRACT.md`
 
@@ -417,7 +395,7 @@ PATCH /handoffs/:id/resolve
 
 ---
 
-## 13. File Reference
+## 12. File Reference
 
 ```
 customer-support-agent/

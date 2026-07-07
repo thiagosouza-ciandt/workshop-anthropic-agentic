@@ -6,13 +6,15 @@
 
 ## Overview
 
-| Step | Duration | What you build |
-|---|---|---|
-| 1 — Base Agent | 20 min | System prompt, structured output, Bedrock client |
-| 2 — Tool Calling | 30 min | DB helpers, tool definitions, agentic loop |
-| 3 — Subagents | 30 min | Coordinator + 3 specialist agents |
-| 4 — Backoffice + SSE | 40 min | Real-time handoff, human-in-the-loop |
-| 5 — MCP | 20 min | Internal document search via MCP filesystem |
+| Step | Duration | What you build | Focus |
+|---|---|---|---|
+| 1 — Base Agent | 20 min | System prompt, structured output, Bedrock client | Core Anthropic patterns |
+| 2 — Tool Calling | 30 min | DB helpers, tool definitions, agentic loop | Core Anthropic patterns |
+| 3 — Subagents | 30 min | Coordinator + 3 specialist agents | Core Anthropic patterns |
+| 4 — MCP | 20 min | Internal document search via MCP filesystem | Core Anthropic patterns |
+| 5 — Human-in-the-loop | 40 min | Real-time handoff, backoffice UI | Human oversight layer |
+
+> **Total: ~2h 20min.** Steps 1–4 are pure Anthropic patterns. Step 5 adds human oversight using SSE (a web standard, not Anthropic-specific).
 
 ---
 
@@ -83,7 +85,7 @@ The frontend renders `response`, shows `suggested_questions` as buttons, and det
 
 ### Discussion: What is `thinking`?
 
-It is Claude's internal reasoning before answering. The customer never sees it. In Step 4, the backoffice will display it — this is the first step toward agent observability.
+It is Claude's internal reasoning before answering. The customer never sees it. In Step 5, the backoffice will display it — this is the first step toward agent observability.
 
 ---
 
@@ -822,15 +824,222 @@ The Coordinator delegates to two agents in sequence and synthesizes a single res
 
 ---
 
-# STEP 4 — Backoffice + Real-Time + Human-in-the-Loop
+# STEP 4 — MCP: Internal Document Search
+
+**Duration:** 20 minutes
+
+**What you'll learn:** What MCP is, how to connect an agent to a local document server, and why MCP matters as a standard protocol for AI integrations.
+
+---
+
+## 4.1 — What is MCP?
+
+**Model Context Protocol** is an open standard for connecting AI agents to external data sources. Instead of building a custom fetch integration for each data source, you connect to an MCP server — and the same agent code works with Google Drive, Notion, GitHub, databases, and more.
+
+```
+Without MCP:  Agent → custom fetch() → your API → data
+With MCP:     Agent → MCP client → MCP server → any data source
+```
+
+In this step, the agent gains the ability to search CorpBank's internal policy documents. When a customer asks "what's the interest rate?", instead of making something up, the agent searches the real documentation.
+
+---
+
+## 4.2 — Install the MCP SDK
+
+```bash
+npm install @modelcontextprotocol/sdk
+```
+
+---
+
+## 4.3 — Create `app/lib/mcp-docs.ts`
+
+This file creates an MCP client that spawns the filesystem server as a subprocess:
+
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import path from "path";
+
+const DOCS_PATH = path.join(process.cwd(), "docs");
+
+// Keep a single client alive across requests (stored in globalThis)
+const g = globalThis as any;
+
+async function getMcpClient(): Promise<Client> {
+  if (g.__mcp_docs_client) return g.__mcp_docs_client;
+
+  const transport = new StdioClientTransport({
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem", DOCS_PATH],
+  });
+
+  const client = new Client({ name: "corpbank-docs", version: "1.0.0" });
+  await client.connect(transport);
+
+  g.__mcp_docs_client = client;
+  return client;
+}
+
+export async function searchDocs(query: string): Promise<string> {
+  try {
+    const client = await getMcpClient();
+
+    // List all files the MCP server exposes
+    const { resources } = await client.listResources();
+
+    const results: { file: string; excerpt: string }[] = [];
+    const queryLower = query.toLowerCase();
+
+    for (const resource of resources) {
+      const { contents } = await client.readResource({ uri: resource.uri });
+      for (const content of contents) {
+        if (content.type !== "text") continue;
+        const text = content.text as string;
+        if (text.toLowerCase().includes(queryLower)) {
+          const lines = text.split("\n");
+          const matchingLines = lines.filter(l => l.toLowerCase().includes(queryLower));
+          results.push({
+            file: resource.name ?? resource.uri,
+            excerpt: matchingLines.slice(0, 3).join(" ").trim(),
+          });
+        }
+      }
+    }
+
+    if (results.length === 0) {
+      return JSON.stringify({ found: false, message: `No documents found matching: "${query}"` });
+    }
+
+    return JSON.stringify({ found: true, results });
+  } catch (err: any) {
+    return JSON.stringify({ error: err.message });
+  }
+}
+```
+
+---
+
+## 4.4 — Add import to `route.ts`
+
+At the top of `app/api/chat/route.ts`, after the existing imports:
+
+```typescript
+import { searchDocs } from "@/app/lib/mcp-docs";
+```
+
+---
+
+## 4.5 — Add the tool definition
+
+Inside the `tools` array, before `escalate_to_human`:
+
+```typescript
+{
+  name: "search_docs",
+  description:
+    "Searches CorpBank's internal policy documents. Use when the customer asks about rates, fees, policies, eligibility, products, or any question that requires official documentation rather than live account data.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      query: { type: "string", description: "Keywords to search, e.g. 'loan interest rate'" },
+    },
+    required: ["query"],
+  },
+},
+```
+
+---
+
+## 4.6 — Add the executor case
+
+Inside `executeTool`, before the `escalate_to_human` case:
+
+```typescript
+case "search_docs":
+  result = await searchDocs(input.query);
+  break;
+```
+
+---
+
+## 4.7 — Update the system prompt
+
+Add `search_docs` to the tool list in `SYSTEM_PROMPT`:
+
+```
+- search_docs: search CorpBank policy documents (rates, fees, eligibility, products)
+```
+
+---
+
+## 4.8 — Look at the documents
+
+Open the `docs/` folder. Four markdown files:
+
+| File | Content |
+|---|---|
+| `loan-policy.md` | Interest rates, repayment, eligibility, exceptions |
+| `credit-limit-policy.md` | Default limits, increase process, automatic reviews |
+| `faq.md` | Common customer questions with answers |
+| `products.md` | Account types, support channels |
+
+These are the files the MCP server exposes. In production, these could be in Google Drive, Notion, or any other source with an MCP server.
+
+---
+
+## 4.9 — Test
+
+Send these messages (no need to identify yourself for policy questions):
+
+```
+What's the interest rate for a $1,000 loan?
+```
+
+**Watch the terminal:**
+```
+🔧 Tool call: search_docs { query: 'interest rate 1000 loan' }
+✅ Tool result: search_docs {"found":true,"results":[{"file":"loan-policy.md","excerpt":"$501 – $2,000 | Up to 24 months | 11.0%"}]}
+```
+
+Try also:
+```
+How can I increase my credit limit?
+What happens if I miss a payment?
+What accounts does CorpBank offer?
+```
+
+---
+
+## Discussion: MCP transport types
+
+| Transport | When to use |
+|---|---|
+| **stdio** | Local servers (filesystem, local DB) — subprocess spawned by the agent |
+| **HTTP + SSE** | Remote servers (Google Drive, Notion, shared company knowledge base) |
+
+In this step we used stdio. To connect to a remote MCP server (e.g., Google Drive), you would change only the transport — the `client.listResources()` and `client.readResource()` calls stay identical.
+
+---
+
+## Discussion: Why MCP instead of a direct fetch?
+
+If you built a direct integration with Google Drive, you would write OAuth2 flows, handle pagination, parse Drive's API response format, and maintain the code as the API changes. With MCP, a community-maintained server handles all of that — you just connect and call `listResources`.
+
+---
+
+# STEP 5 — Human-in-the-Loop
 
 **Duration:** 40 minutes
+
+> **Note:** SSE (Server-Sent Events) is a standard browser protocol — not an Anthropic concept. This step focuses on the **human oversight pattern**: how to hand off, how to pass context, and how to let a human approve decisions the agent cannot make alone.
 
 **What you'll learn:** How to stream events in real time with SSE, how to transfer a conversation to a human agent, and how the human can respond to and resolve the case.
 
 ---
 
-## 4.1 — Create the SSE store
+## 5.1 — Create the SSE store
 
 Create: `app/lib/sse-store.ts`
 
@@ -889,7 +1098,7 @@ export function publish(channel: string, event: SSEEvent) {
 
 ---
 
-## 4.2 — Create the SSE endpoint
+## 5.2 — Create the SSE endpoint
 
 Create: `app/api/stream/route.ts`
 
@@ -924,7 +1133,7 @@ export async function GET(req: Request) {
 
 ---
 
-## 4.3 — Create the handoff endpoint
+## 5.3 — Create the handoff endpoint
 
 Create: `app/api/handoff/route.ts`
 
@@ -999,7 +1208,7 @@ export async function PATCH(req: Request) {
 
 ---
 
-## 4.4 — Update route.ts (add escalation + SSE)
+## 5.4 — Update route.ts (add escalation + SSE)
 
 **Add** to the imports at the top of `route.ts`:
 
@@ -1087,7 +1296,7 @@ export async function POST(req: Request) {
 
 ---
 
-## 4.5 — Create the backoffice page
+## 5.5 — Create the backoffice page
 
 Create the directory and file: `app/backoffice/page.tsx`
 
@@ -1101,7 +1310,7 @@ This is the only file in the workshop that is pasted whole — it is pure UI wit
 
 ---
 
-## 4.6 — Test the full flow
+## 5.6 — Test the full flow
 
 Open two browser windows side by side:
 - `http://localhost:3000` — customer
@@ -1153,211 +1362,6 @@ No polling. No refresh. The server pushes events as they happen.
 ---
 
 ---
-
----
-
-# STEP 5 — MCP: Internal Document Search
-
-**Duration:** 20 minutes
-
-**What you'll learn:** What MCP is, how to connect an agent to a local document server, and why MCP matters as a standard protocol for AI integrations.
-
----
-
-## 5.1 — What is MCP?
-
-**Model Context Protocol** is an open standard for connecting AI agents to external data sources. Instead of building a custom fetch integration for each data source, you connect to an MCP server — and the same agent code works with Google Drive, Notion, GitHub, databases, and more.
-
-```
-Without MCP:  Agent → custom fetch() → your API → data
-With MCP:     Agent → MCP client → MCP server → any data source
-```
-
-In this step, the agent gains the ability to search CorpBank's internal policy documents. When a customer asks "what's the interest rate?", instead of making something up, the agent searches the real documentation.
-
----
-
-## 5.2 — Install the MCP SDK
-
-```bash
-npm install @modelcontextprotocol/sdk
-```
-
----
-
-## 5.3 — Create `app/lib/mcp-docs.ts`
-
-This file creates an MCP client that spawns the filesystem server as a subprocess:
-
-```typescript
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import path from "path";
-
-const DOCS_PATH = path.join(process.cwd(), "docs");
-
-// Keep a single client alive across requests (stored in globalThis)
-const g = globalThis as any;
-
-async function getMcpClient(): Promise<Client> {
-  if (g.__mcp_docs_client) return g.__mcp_docs_client;
-
-  const transport = new StdioClientTransport({
-    command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-filesystem", DOCS_PATH],
-  });
-
-  const client = new Client({ name: "corpbank-docs", version: "1.0.0" });
-  await client.connect(transport);
-
-  g.__mcp_docs_client = client;
-  return client;
-}
-
-export async function searchDocs(query: string): Promise<string> {
-  try {
-    const client = await getMcpClient();
-
-    // List all files the MCP server exposes
-    const { resources } = await client.listResources();
-
-    const results: { file: string; excerpt: string }[] = [];
-    const queryLower = query.toLowerCase();
-
-    for (const resource of resources) {
-      const { contents } = await client.readResource({ uri: resource.uri });
-      for (const content of contents) {
-        if (content.type !== "text") continue;
-        const text = content.text as string;
-        if (text.toLowerCase().includes(queryLower)) {
-          const lines = text.split("\n");
-          const matchingLines = lines.filter(l => l.toLowerCase().includes(queryLower));
-          results.push({
-            file: resource.name ?? resource.uri,
-            excerpt: matchingLines.slice(0, 3).join(" ").trim(),
-          });
-        }
-      }
-    }
-
-    if (results.length === 0) {
-      return JSON.stringify({ found: false, message: `No documents found matching: "${query}"` });
-    }
-
-    return JSON.stringify({ found: true, results });
-  } catch (err: any) {
-    return JSON.stringify({ error: err.message });
-  }
-}
-```
-
----
-
-## 5.4 — Add import to `route.ts`
-
-At the top of `app/api/chat/route.ts`, after the existing imports:
-
-```typescript
-import { searchDocs } from "@/app/lib/mcp-docs";
-```
-
----
-
-## 5.5 — Add the tool definition
-
-Inside the `tools` array, before `escalate_to_human`:
-
-```typescript
-{
-  name: "search_docs",
-  description:
-    "Searches CorpBank's internal policy documents. Use when the customer asks about rates, fees, policies, eligibility, products, or any question that requires official documentation rather than live account data.",
-  input_schema: {
-    type: "object" as const,
-    properties: {
-      query: { type: "string", description: "Keywords to search, e.g. 'loan interest rate'" },
-    },
-    required: ["query"],
-  },
-},
-```
-
----
-
-## 5.6 — Add the executor case
-
-Inside `executeTool`, before the `escalate_to_human` case:
-
-```typescript
-case "search_docs":
-  result = await searchDocs(input.query);
-  break;
-```
-
----
-
-## 5.7 — Update the system prompt
-
-Add `search_docs` to the tool list in `SYSTEM_PROMPT`:
-
-```
-- search_docs: search CorpBank policy documents (rates, fees, eligibility, products)
-```
-
----
-
-## 5.8 — Look at the documents
-
-Open the `docs/` folder. Four markdown files:
-
-| File | Content |
-|---|---|
-| `loan-policy.md` | Interest rates, repayment, eligibility, exceptions |
-| `credit-limit-policy.md` | Default limits, increase process, automatic reviews |
-| `faq.md` | Common customer questions with answers |
-| `products.md` | Account types, support channels |
-
-These are the files the MCP server exposes. In production, these could be in Google Drive, Notion, or any other source with an MCP server.
-
----
-
-## 5.9 — Test
-
-Send these messages (no need to identify yourself for policy questions):
-
-```
-What's the interest rate for a $1,000 loan?
-```
-
-**Watch the terminal:**
-```
-🔧 Tool call: search_docs { query: 'interest rate 1000 loan' }
-✅ Tool result: search_docs {"found":true,"results":[{"file":"loan-policy.md","excerpt":"$501 – $2,000 | Up to 24 months | 11.0%"}]}
-```
-
-Try also:
-```
-How can I increase my credit limit?
-What happens if I miss a payment?
-What accounts does CorpBank offer?
-```
-
----
-
-## Discussion: MCP transport types
-
-| Transport | When to use |
-|---|---|
-| **stdio** | Local servers (filesystem, local DB) — subprocess spawned by the agent |
-| **HTTP + SSE** | Remote servers (Google Drive, Notion, shared company knowledge base) |
-
-In this step we used stdio. To connect to a remote MCP server (e.g., Google Drive), you would change only the transport — the `client.listResources()` and `client.readResource()` calls stay identical.
-
----
-
-## Discussion: Why MCP instead of a direct fetch?
-
-If you built a direct integration with Google Drive, you would write OAuth2 flows, handle pagination, parse Drive's API response format, and maintain the code as the API changes. With MCP, a community-maintained server handles all of that — you just connect and call `listResources`.
 
 ---
 
