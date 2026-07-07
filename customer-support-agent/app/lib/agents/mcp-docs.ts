@@ -60,8 +60,9 @@ export async function searchDocs(query: string): Promise<string> {
       const { contents } = await client.readResource({ uri: resource.uri });
 
       for (const content of contents) {
-        if (content.type !== "text") continue;
-        const text = content.text as string;
+        const c = content as any;
+        if (c.type !== "text") continue;
+        const text = c.text as string;
         if (text.toLowerCase().includes(queryLower)) {
           // Extract the paragraph containing the keyword
           const lines = text.split("\n");

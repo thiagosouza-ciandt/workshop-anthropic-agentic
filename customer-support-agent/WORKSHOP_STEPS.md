@@ -853,7 +853,18 @@ npm install @modelcontextprotocol/sdk
 
 ---
 
-## 4.3 — Create `app/lib/mcp-docs.ts`
+## 4.3 — Create `app/lib/agents/mcp-docs.ts`
+
+Create this file inside the agents folder — alongside the other specialist agents:
+
+```
+app/lib/agents/
+  mcp-docs.ts      ← create this
+  customer-data.ts
+  billing.ts
+  payments.ts
+  coordinator.ts
+```
 
 This file creates an MCP client that spawns the filesystem server as a subprocess:
 
@@ -926,7 +937,7 @@ export async function searchDocs(query: string): Promise<string> {
 At the top of `app/api/chat/route.ts`, after the existing imports:
 
 ```typescript
-import { searchDocs } from "@/app/lib/mcp-docs";
+import { searchDocs } from "@/app/lib/agents/mcp-docs";
 ```
 
 ---

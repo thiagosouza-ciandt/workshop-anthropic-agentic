@@ -15,7 +15,7 @@ import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { z } from "zod";
 import crypto from "crypto";
 import { publish, getConvCustomer, setConvCustomer } from "@/app/lib/sse-store";
-import { searchDocs } from "@/app/lib/mcp-docs";
+import { searchDocs } from "@/app/lib/agents/mcp-docs";
 
 // Allowlist for customer IDs — must match DB pattern to prevent prompt injection
 const CUSTOMER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;

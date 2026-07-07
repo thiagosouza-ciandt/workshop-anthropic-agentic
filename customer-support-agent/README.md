@@ -411,7 +411,12 @@ customer-support-agent/
 │   ├── backoffice/page.tsx        ← Human agent UI
 │   ├── db/page.tsx                ← Database CRUD interface
 │   └── lib/
-│       ├── mcp-docs.ts            ← MCP client for document search
+│       ├── agents/
+│       │   ├── mcp-docs.ts        ← MCP client for document search (Step 4)
+│       │   ├── customer-data.ts   ← Customer data specialist (Step 3)
+│       │   ├── billing.ts         ← Billing specialist (Step 3)
+│       │   ├── payments.ts        ← Payments specialist (Step 3)
+│       │   └── coordinator.ts     ← Orchestrator (Step 3)
 │       └── sse-store.ts           ← In-memory pub/sub + conv→customer map
 │
 ├── components/
