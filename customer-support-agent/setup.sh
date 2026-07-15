@@ -48,11 +48,21 @@ else
   success "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 fi
 
-# Docker Compose (plugin or standalone)
-if docker compose version &>/dev/null 2>&1; then
-  COMPOSE="docker compose"
-elif docker-compose version &>/dev/null 2>&1; then
-  COMPOSE="docker-compose"
+# Determine whether docker needs sudo (group not yet active in this session)
+if docker info &>/dev/null 2>&1; then
+  DOCKER_CMD="docker"
+elif sudo docker info &>/dev/null 2>&1; then
+  DOCKER_CMD="sudo docker"
+  warn "Running Docker with sudo (log out and back in to use it without sudo after setup)."
+else
+  error "Cannot connect to Docker. Make sure the Docker daemon is running."
+fi
+
+# Docker Compose (plugin or standalone), respecting sudo
+if $DOCKER_CMD compose version &>/dev/null 2>&1; then
+  COMPOSE="$DOCKER_CMD compose"
+elif command -v docker-compose &>/dev/null; then
+  COMPOSE="$(command -v docker-compose)"
 else
   error "Docker Compose not found. Install it with: sudo apt install docker-compose-plugin"
 fi
