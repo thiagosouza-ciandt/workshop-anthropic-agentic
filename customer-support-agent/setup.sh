@@ -71,25 +71,37 @@ else
 fi
 success "Compose: $($COMPOSE version --short 2>/dev/null || $COMPOSE version | head -1)"
 
-# ── 3. Node.js ────────────────────────────────────────────────────────────────
-info "Checking Node.js..."
-if ! command -v node &>/dev/null; then
-  info "Node.js not found — installing via nvm..."
-  curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-  # Load nvm in current shell
-  export NVM_DIR="$HOME/.nvm"
-  # shellcheck source=/dev/null
-  [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-  nvm install 20
-  nvm use 20
-else
-  NODE_VERSION=$(node --version | tr -d 'v')
-  NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d. -f1)
-  if [[ "$NODE_MAJOR" -lt 18 ]]; then
-    error "Node.js $NODE_VERSION found but >=18 is required. Install via nvm: nvm install 20"
-  fi
-  success "Node.js v$NODE_VERSION"
+# ── 3. Node.js + npm ─────────────────────────────────────────────────────────
+info "Checking Node.js and npm..."
+
+NODE_OK=false
+if command -v node &>/dev/null; then
+  NODE_MAJOR=$(node --version | tr -d 'v' | cut -d. -f1)
+  [[ "$NODE_MAJOR" -ge 18 ]] && NODE_OK=true
 fi
+
+if [[ "$NODE_OK" == false ]]; then
+  info "Installing Node.js 20 via NodeSource (removing old version first)..."
+  sudo apt-get update -qq
+  sudo apt-get remove -y -qq nodejs npm 2>/dev/null || true
+  sudo apt-get autoremove -y -qq 2>/dev/null || true
+  sudo apt-get install -y -qq curl ca-certificates
+  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  sudo apt-get install -y -qq nodejs
+
+  # Reload PATH so the new node is found immediately
+  hash -r
+fi
+
+# Verify version after install
+NODE_MAJOR=$(node --version | tr -d 'v' | cut -d. -f1)
+if [[ "$NODE_MAJOR" -lt 18 ]]; then
+  error "Node.js $(node --version) is still active after install. Open a new shell and retry."
+fi
+
+NODE_VERSION=$(node --version)
+NPM_VERSION=$(npm --version)
+success "Node.js $NODE_VERSION  |  npm $NPM_VERSION"
 
 # ── 4. .env.local ─────────────────────────────────────────────────────────────
 info "Checking .env.local..."
