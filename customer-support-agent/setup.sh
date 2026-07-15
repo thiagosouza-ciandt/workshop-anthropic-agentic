@@ -48,21 +48,24 @@ else
   success "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 fi
 
-# Determine whether docker needs sudo (group not yet active in this session)
-if docker info &>/dev/null 2>&1; then
-  DOCKER_CMD="docker"
-elif sudo docker info &>/dev/null 2>&1; then
-  DOCKER_CMD="sudo docker"
-  warn "Running Docker with sudo (log out and back in to use it without sudo after setup)."
-else
-  error "Cannot connect to Docker. Make sure the Docker daemon is running."
+# Determine whether docker needs sudo.
+# Tests with docker info (requires daemon access) — not just docker version.
+SUDO=""
+if ! docker info &>/dev/null 2>&1; then
+  if sudo docker info &>/dev/null 2>&1; then
+    SUDO="sudo"
+    warn "Docker socket not accessible without sudo — running with sudo."
+    warn "To fix permanently: sudo usermod -aG docker \$USER  (then log out and back in)"
+  else
+    error "Cannot connect to Docker daemon. Is it running? Try: sudo systemctl start docker"
+  fi
 fi
 
-# Docker Compose (plugin or standalone), respecting sudo
-if $DOCKER_CMD compose version &>/dev/null 2>&1; then
-  COMPOSE="$DOCKER_CMD compose"
-elif command -v docker-compose &>/dev/null; then
-  COMPOSE="$(command -v docker-compose)"
+# Build compose command — always prefix with $SUDO so it matches docker access
+if ${SUDO:+$SUDO} docker compose version &>/dev/null 2>&1; then
+  COMPOSE="${SUDO:+$SUDO }docker compose"
+elif ${SUDO:+$SUDO} docker-compose version &>/dev/null 2>&1; then
+  COMPOSE="${SUDO:+$SUDO }docker-compose"
 else
   error "Docker Compose not found. Install it with: sudo apt install docker-compose-plugin"
 fi
