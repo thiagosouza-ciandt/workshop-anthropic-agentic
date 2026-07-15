@@ -1,15 +1,11 @@
-// ============================================================
-// POST /api/handoff   — human sends a message to the customer
-// PATCH /api/handoff  — human resolves the loan (approve/reject)
-// ============================================================
+// POST /api/handoff  — human sends a message to the customer or returns to AI
+// PATCH /api/handoff — human approves or rejects the loan and resolves the handoff
 
 import { publish } from "@/app/lib/sse-store";
 
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
-// Simple shared-secret guard for backoffice-only endpoints.
-// In production replace with proper session auth + RBAC.
-// Set BACKOFFICE_SECRET in .env.local; if not set, falls back to "workshop" (dev only).
+// Shared-secret guard for backoffice endpoints — set BACKOFFICE_SECRET in .env.local
 const BACKOFFICE_SECRET = process.env.BACKOFFICE_SECRET ?? "workshop";
 
 function requireBackofficeAuth(req: Request): Response | null {
@@ -30,17 +26,12 @@ async function dbPatch(path: string, body: object) {
   return res.json();
 }
 
-// POST /api/handoff
-// Two sub-actions via `action` field:
-//   "message"        — human sends a message to the customer (requires auth)
-//   "customer_reply" — customer replies during handoff, forwarded to backoffice (no auth)
-//   "return_to_agent"— human ends the handoff and returns to AI agent (requires auth)
+// Three sub-actions: "message" (human→customer), "customer_reply" (customer→backoffice), "return_to_agent"
 export async function POST(req: Request) {
   const body = await req.json();
   const action = body.action ?? "message";
 
   if (action === "customer_reply") {
-    // Customer-side: forward message to backoffice SSE channel
     const { conversation_id, message } = body;
     if (!conversation_id || !message)
       return Response.json({ error: "conversation_id and message required" }, { status: 400 });
@@ -61,16 +52,13 @@ export async function POST(req: Request) {
     if (!conversation_id || !handoff_id)
       return Response.json({ error: "conversation_id and handoff_id required" }, { status: 400 });
 
-    // Resolve the handoff in the DB
     await dbPatch(`/handoffs/${handoff_id}/resolve`, {});
 
-    // Notify the customer chat to switch back to AI mode
     publish(conversation_id, {
       type: "agent_returned",
       payload: { conversation_id },
     });
 
-    // Notify backoffice
     publish("*", {
       type: "agent_returned",
       payload: { conversation_id },
@@ -79,7 +67,7 @@ export async function POST(req: Request) {
     return Response.json({ success: true });
   }
 
-  // Default: human sends a message to the customer
+  // Default action: human sends a message to the customer
   const { conversation_id, message } = body;
   if (!conversation_id || !message)
     return Response.json({ error: "conversation_id and message are required" }, { status: 400 });
@@ -92,10 +80,7 @@ export async function POST(req: Request) {
   return Response.json({ success: true });
 }
 
-// PATCH /api/handoff
-// Human approves or rejects and resolves the handoff
-// Body: { handoff_id, loan_id, conversation_id, decision, reason?, amount? }
-// Note: resolved_by is set server-side — never trusted from the client
+// resolved_by is derived server-side — never trusted from the request body
 export async function PATCH(req: Request) {
   const authError = requireBackofficeAuth(req);
   if (authError) return authError;
@@ -115,7 +100,6 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    // 1. Resolve the loan in the database (only if loan_id present)
     if (loan_id) {
       await dbPatch(`/loans/${loan_id}/resolve`, {
         decision,
@@ -124,15 +108,10 @@ export async function PATCH(req: Request) {
       });
     }
 
-    // 2. Resolve the handoff in the database
     await dbPatch(`/handoffs/${handoff_id}/resolve`, {});
 
     const payload = { conversation_id, loan_id, decision, reason, amount };
-
-    // 3. Notify the customer via SSE
     publish(conversation_id, { type: "loan_resolved", payload });
-
-    // 4. Notify the backoffice (global channel)
     publish("*", { type: "loan_resolved", payload });
 
     return Response.json({ success: true, decision });

@@ -263,7 +263,7 @@ Events between the agent, customer, and backoffice are pushed via **Server-Sent 
 
 **Model Context Protocol (MCP)** is an open standard for connecting AI agents to external data sources without writing custom integrations for each one.
 
-In this project, an MCP filesystem server exposes the `docs/` folder. When the customer asks about rates, fees, or policies, the agent calls `search_docs` and returns accurate, sourced information.
+In this project, an MCP filesystem server exposes the `docs/` folder as a Docker container. When the customer asks about rates, fees, or policies, the agent calls `search_docs` and returns accurate, sourced information.
 
 ### Documents
 
@@ -274,23 +274,32 @@ In this project, an MCP filesystem server exposes the `docs/` folder. When the c
 | `docs/faq.md` | Common customer questions with official answers |
 | `docs/products.md` | Account types, support channels |
 
+### Infrastructure
+
+The MCP server runs as a Docker container (`corpbank-mcp-docs`) using [supergateway](https://github.com/supercorp-ai/supergateway), which wraps the `@modelcontextprotocol/server-filesystem` stdio process and exposes it as **SSE** on port `8082`. The `docs/` folder is mounted as a read-only volume.
+
+```
+docker-compose.yml
+└── mcp-docs (supercorp/supergateway)
+      ├── wraps: npx @modelcontextprotocol/server-filesystem /docs
+      ├── exposes: http://localhost:8082/sse  (SSE transport)
+      └── volume: ../docs → /docs (read-only)
+```
+
 ### How the MCP client works
 
 ```typescript
-// Spawns as a subprocess (stdio transport)
-const transport = new StdioClientTransport({
-  command: "npx",
-  args: ["-y", "@modelcontextprotocol/server-filesystem", DOCS_PATH],
-});
+// Connects via SSE — no subprocess spawned by the app
+const transport = new SSEClientTransport(new URL(MCP_DOCS_URL));
 const client = new Client({ name: "corpbank-docs", version: "1.0.0" });
 await client.connect(transport);
 
-// Agent calls these:
+// Agent calls these — identical regardless of transport:
 const { resources } = await client.listResources();  // list all docs
 const { contents } = await client.readResource({ uri }); // read one doc
 ```
 
-> To connect to Google Drive, Notion, or Confluence instead — swap the transport. The `listResources` and `readResource` calls stay identical.
+> To connect to Google Drive, Notion, or Confluence instead — swap the Docker image and set `MCP_DOCS_URL` in `.env.local`. The `listResources` and `readResource` calls stay identical.
 
 ---
 
@@ -324,6 +333,7 @@ Create `.env.local` in the project root:
 AWS_REGION=us-east-1
 BACKOFFICE_SECRET=workshop
 CORPDB_URL=http://localhost:3001
+MCP_DOCS_URL=http://localhost:8082/sse
 ```
 
 ### Start the infrastructure
@@ -337,6 +347,7 @@ Verify:
 ```bash
 curl http://localhost:3001/health     # {"status":"ok"}
 curl http://localhost:3001/customers  # returns seed customers
+curl http://localhost:8082/health     # MCP docs server
 ```
 
 ### Start the app

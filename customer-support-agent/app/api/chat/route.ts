@@ -1,15 +1,4 @@
-// ============================================================
-// WORKSHOP — Step 2: Tool Calling
-// ============================================================
-// What this step adds (compared to Step 1):
-//   • Tool definition for Claude
-//   • Agentic loop: Claude calls tools → we receive the result → Claude continues
-//   • Real queries to CorpDB (SQLite via REST API)
-//
-// What is NOT here yet:
-//   • Specialized subagents
-//   • Human-in-the-loop
-// ============================================================
+// Chat API route — router agent with tool calling and agentic loop.
 
 import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { z } from "zod";
@@ -46,15 +35,8 @@ async function dbPost(path: string, body: object) {
   return res.json();
 }
 
-// ── 2. Tool definitions ───────────────────────────────────────────────────────
-// Each tool has:
-//   • name: identifier that Claude uses to call it
-//   • description: Claude reads this to decide WHEN to use the tool
-//   • input_schema: the parameters Claude must pass
+// ── Tool definitions ──────────────────────────────────────────────────────────
 const tools: Parameters<InstanceType<typeof AnthropicBedrock>["messages"]["create"]>[0]["tools"] = [
-  // ── STEP 2: identification tool ──────────────────────────────────────────────
-  // Call this tool as soon as the customer provides their name and phone number.
-  // It returns the customer_id that the other tools need.
   {
     name: "identify_customer",
     description:
@@ -68,7 +50,6 @@ const tools: Parameters<InstanceType<typeof AnthropicBedrock>["messages"]["creat
       required: ["name", "phone"],
     },
   },
-  // ─────────────────────────────────────────────────────────────────────────────
   {
     name: "get_customer",
     description:
@@ -173,20 +154,17 @@ const tools: Parameters<InstanceType<typeof AnthropicBedrock>["messages"]["creat
   },
 ];
 
-// ── 3. Tool Executor ──────────────────────────────────────────────────────────
-// Receives the name and inputs Claude chose, executes them, and returns the result.
+// ── Tool executor — dispatches tool calls to the appropriate handler ──────────
 async function executeTool(name: string, input: any): Promise<string> {
   try {
     let result: any;
 
     switch (name) {
-      // ── STEP 2: identification tool executor ────────────────────────────────
       case "identify_customer":
         result = await db(
           `/customers/identify?name=${encodeURIComponent(input.name)}&phone=${encodeURIComponent(input.phone)}`
         );
         break;
-      // ────────────────────────────────────────────────────────────────────────
 
       case "get_customer":
         result = await db(`/customers/${input.customer_id}`);
@@ -236,7 +214,7 @@ async function executeTool(name: string, input: any): Promise<string> {
   }
 }
 
-// ── 4. Final Response Schema ──────────────────────────────────────────────────
+// ── Response schema — Zod validates Claude's JSON output before returning ─────
 const responseSchema = z.object({
   thinking: z.string(),
   response: z.string(),
@@ -253,7 +231,7 @@ const responseSchema = z.object({
   handoff_initiated: z.boolean().optional(),
 });
 
-// ── 5. System prompt ──────────────────────────────────────────────────────────
+// ── System prompt — agent identity, tool usage rules, and output format ──────
 const SYSTEM_PROMPT = `You are a virtual customer support assistant for CorpBank.
 Be friendly, clear, and concise. Always reply in English.
 
@@ -305,7 +283,7 @@ IMPORTANT: Always respond as a valid JSON object:
   "debug": { "context_used": true }
 }`;
 
-// ── 6. Parser JSON ────────────────────────────────────────────────────────────
+// ── JSON parser — strips markdown fences and extracts the JSON object ─────────
 function parseJSON(text: string) {
   const stripped = text
     .replace(/^```(?:json)?\s*/i, "")
@@ -325,7 +303,7 @@ function parseJSON(text: string) {
   };
 }
 
-// ── 7. Agentic loop ───────────────────────────────────────────────────────────
+// ── Agentic loop — calls Claude, executes tool calls, loops until end_turn ────
 type LoopResult = { text: string; escalation: any | null; customerId: string | null };
 
 async function runAgentLoop(
@@ -388,7 +366,7 @@ async function runAgentLoop(
   }
 }
 
-// ── 8. Main Handler ───────────────────────────────────────────────────────────
+// ── POST handler — entry point, triggers the loop and handles handoffs ────────
 export async function POST(req: Request) {
   const { messages, model, conversationId = crypto.randomUUID() } = await req.json();
   // Never trust customerId from the client — look it up server-side by conversationId

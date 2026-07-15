@@ -1,35 +1,18 @@
-// ============================================================
-// WORKSHOP — Step 1: Base Agent
-// ============================================================
-// What this step teaches:
-//   • How to call Claude via Amazon Bedrock
-//   • How to use a system prompt to give the agent an identity
-//   • How to force structured output (JSON) via prompt
-//   • How to validate the response with Zod
-//
-// What is NOT here yet (comes in the next steps):
-//   • Tool calling / database queries
-//   • Specialized subagents
-//   • Human-in-the-loop
-// ============================================================
+// Step 1 baseline — single Claude call, no tools. Starting point for the workshop.
 
 import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { z } from "zod";
 import crypto from "crypto";
 
-// ── 1. Bedrock Client ────────────────────────────────────────────────────────
-// Authenticates via IAM Role — no keys in the code.
-// AWS_REGION comes from .env.local (default: us-east-1)
+// Authenticates via IAM Role — AWS_REGION from .env.local
 const anthropic = new AnthropicBedrock({
   awsRegion: process.env.AWS_REGION ?? "us-east-1",
 });
 
-// ── 2. Response Schema ────────────────────────────────────────────────────────
-// Zod validates that Claude always returns the format expected by the frontend.
-// If any field is missing, the route throws an error before responding.
+// ── Response schema ───────────────────────────────────────────────────────────
 const responseSchema = z.object({
-  thinking: z.string(),           // agent's internal reasoning (visible in the backoffice)
-  response: z.string(),           // message shown to the customer
+  thinking: z.string(),
+  response: z.string(),
   user_mood: z.enum([
     "positive", "neutral", "negative",
     "curious", "frustrated", "confused",
@@ -42,8 +25,7 @@ const responseSchema = z.object({
   debug: z.object({ context_used: z.boolean() }),
 });
 
-// ── 3. System prompt ──────────────────────────────────────────────────────────
-// Defines the agent identity and scope.
+// ── System prompt ─────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are a virtual customer support assistant for CorpBank.
 Be friendly, clear, and concise. Always reply in English.
 
@@ -75,9 +57,7 @@ IMPORTANT: Always respond as a valid JSON object in exactly this format:
   }
 }`;
 
-// ── 4. JSON Parser ────────────────────────────────────────────────────────────
-// Claude sometimes wraps JSON in markdown (```json ... ```).
-// This function removes the wrapper and extracts the object.
+// ── JSON parser — strips markdown fences if present ──────────────────────────
 function parseJSON(text: string) {
   const stripped = text
     .replace(/^```(?:json)?\s*/i, "")
@@ -87,18 +67,16 @@ function parseJSON(text: string) {
   return JSON.parse(match ? match[0] : stripped);
 }
 
-// ── 5. Main Handler ───────────────────────────────────────────────────────────
+// ── POST handler ──────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
   const { messages, model } = await req.json();
 
-  // Maps the history to the SDK format
   const anthropicMessages = messages.map((msg: any) => ({
     role: msg.role,
     content: msg.content,
   }));
 
   try {
-    // Call to Claude via Bedrock
     const response = await anthropic.messages.create({
       model: model ?? "us.anthropic.claude-haiku-4-5-20251001-v1:0",
       max_tokens: 1024,
@@ -106,13 +84,11 @@ export async function POST(req: Request) {
       messages: anthropicMessages,
     });
 
-    // Extract the response text
     const text = response.content
       .filter((b): b is AnthropicBedrock.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join(" ");
 
-    // Validate and return
     const parsed = parseJSON(text);
     const validated = responseSchema.parse(parsed);
 

@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
+import remarkGfm from "remark-gfm";
 import {
   HandHelping,
   WandSparkles,
@@ -180,7 +181,10 @@ const MessageContent = ({
 
   return (
     <>
-      <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, rehypeHighlight]}
+      >
         {parsed.response || content}
       </ReactMarkdown>
       {parsed.redirect_to_agent && (
@@ -190,7 +194,6 @@ const MessageContent = ({
   );
 };
 
-// Define a type for the model
 type Model = {
   id: string;
   name: string;
@@ -202,7 +205,6 @@ interface Message {
   content: string;
 }
 
-// Define the props interface for ConversationHeader
 interface ConversationHeaderProps {
   selectedModel: string;
   setSelectedModel: (modelId: string) => void;
@@ -306,17 +308,15 @@ function ChatArea() {
   const [showHeader, setShowHeader] = useState(false);
   const [selectedModel, setSelectedModel] = useState("us.anthropic.claude-opus-4-8");
   const [showAvatar, setShowAvatar] = useState(false);
-  // When true, messages go directly to the human agent — not to the AI
-  const [handoffMode, setHandoffMode] = useState(false);
+  const [handoffMode, setHandoffMode] = useState(false); // when true, messages bypass the AI and go to the human agent
   const [hydrated, setHydrated] = useState(false);
 
-  // Restore session from sessionStorage after hydration (client-only)
+  // Restore conversation from sessionStorage after hydration to survive page refreshes
   useEffect(() => {
     const savedId   = sessionStorage.getItem("corpbank_conversation_id");
     const savedMsgs = sessionStorage.getItem("corpbank_messages");
     const savedMode = sessionStorage.getItem("corpbank_handoff_mode");
 
-    // Use stored conversationId if it exists, otherwise persist the new one
     if (savedId) {
       conversationIdRef.current = savedId;
     } else {
@@ -353,7 +353,7 @@ function ChatArea() {
     { id: "us.anthropic.claude-haiku-4-5-20251001-v1:0", name: "Claude Haiku 4.5" },
   ];
 
-  // Persist messages and handoff state across hot reloads
+  // Persist state to sessionStorage on every change
   useEffect(() => {
     try { sessionStorage.setItem("corpbank_messages", JSON.stringify(messages)); } catch {}
   }, [messages]);
@@ -386,10 +386,8 @@ function ChatArea() {
 
   useEffect(() => {
     if (!config.includeLeftSidebar) {
-      // If LeftSidebar is not included, we need to handle the 'updateSidebar' event differently
       const handleUpdateSidebar = (event: CustomEvent<ThinkingContent>) => {
         console.log("LeftSidebar not included. Event data:", event.detail);
-        // You might want to handle this data differently when LeftSidebar is not present
       };
 
       window.addEventListener(
@@ -406,10 +404,8 @@ function ChatArea() {
 
   useEffect(() => {
     if (!config.includeRightSidebar) {
-      // If RightSidebar is not included, we need to handle the 'updateRagSources' event differently
       const handleUpdateRagSources = (event: CustomEvent) => {
         console.log("RightSidebar not included. RAG sources:", event.detail);
-        // You might want to handle this data differently when RightSidebar is not present
       };
 
       window.addEventListener(
@@ -424,7 +420,7 @@ function ChatArea() {
     }
   }, []);
 
-  // ── SSE: receive events from the backoffice ───────────────────────────────────
+  // SSE — receive real-time events from the backoffice (human messages, loan decisions)
   useEffect(() => {
     const es = new EventSource(`/api/stream?channel=${conversationId}`);
 
@@ -466,7 +462,6 @@ function ChatArea() {
     es.onerror = () => console.warn("SSE: reconnecting...");
     return () => es.close();
   }, [conversationId]);
-  // ─────────────────────────────────────────────────────────────────────────────
 
   const decodeDebugData = (response: Response) => {
     const debugData = response.headers.get("X-Debug-Data");
@@ -495,7 +490,7 @@ function ChatArea() {
 
     const text = typeof event === "string" ? event : input;
 
-    // ── Handoff mode: forward message to human agent, skip AI ─────────────────
+    // In handoff mode, forward the message directly to the human agent
     if (handoffMode) {
       if (!text.trim()) return;
       setInput("");
@@ -511,7 +506,6 @@ function ChatArea() {
       });
       return;
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     setIsLoading(true);
 
@@ -628,7 +622,6 @@ function ChatArea() {
       });
       window.dispatchEvent(sidebarEvent);
 
-      // Enter handoff mode — subsequent messages go to the human agent
       if (data.handoff_initiated) setHandoffMode(true);
 
       if (data.redirect_to_agent && data.redirect_to_agent.should_redirect) {

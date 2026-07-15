@@ -1,16 +1,7 @@
-// ============================================================
 // GET /api/stream?channel=<conversation_id|*>
-// ============================================================
-// SSE endpoint. The client (browser) opens an EventSource here and
-// receives events in real time without polling.
-//
-// The backoffice uses channel=* to see all events.
-// The customer chat uses channel=<conversation_id> to receive
-// only the human agent messages directed to that conversation.
-// ============================================================
+// SSE endpoint — backoffice subscribes to "*", customer chat to its own conversationId.
 
 import { subscribe, SSEEvent } from "@/app/lib/sse-store";
-// In production: import { subscribe, SSEEvent } from "@/app/lib/sse-store";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +11,6 @@ export async function GET(req: Request) {
 
   const stream = new ReadableStream({
     start(controller) {
-      // Send an initial comment to keep the connection alive
       controller.enqueue(encoder(`: connected to channel ${channel}\n\n`));
 
       const unsubscribe = subscribe(channel, (event: SSEEvent) => {
@@ -33,7 +23,7 @@ export async function GET(req: Request) {
         }
       });
 
-      // Heartbeat every 25s to prevent browser/proxy timeout
+      // Heartbeat prevents browser/proxy from closing an idle connection
       const heartbeat = setInterval(() => {
         try {
           controller.enqueue(encoder(`: heartbeat\n\n`));
@@ -42,7 +32,7 @@ export async function GET(req: Request) {
         }
       }, 25_000);
 
-      // Cleanup when the client closes the connection
+      // Unsubscribe and stop heartbeat when the client disconnects
       req.signal.addEventListener("abort", () => {
         unsubscribe();
         clearInterval(heartbeat);

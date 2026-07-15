@@ -1,15 +1,4 @@
-// ============================================================
-// SSE Store — in-memory pub/sub between API routes and SSE clients
-// ============================================================
-// How it works:
-//   • The chat route.ts publishes events with publish()
-//   • GET /api/stream listens with subscribe()
-//   • The backoffice and the customer chat open an EventSource pointing to /api/stream
-//
-// Why in-memory?
-//   Sufficient for the workshop — a single Node.js process.
-//   In production it would be Redis Pub/Sub or similar.
-// ============================================================
+// In-memory pub/sub store for SSE events between API routes and browser clients.
 
 export type SSEEvent =
   | { type: "handoff_created";   payload: HandoffPayload }
@@ -33,18 +22,14 @@ export type HandoffPayload = {
   };
 };
 
-// Map of conversation_id → set of WritableStreamDefaultWriter (one per open tab)
 type Subscriber = (event: SSEEvent) => void;
 
-// Use globalThis to survive Next.js hot reloads in dev mode.
-// In production (single long-lived process) this behaves identically to a module-level Map.
+// globalThis survives Next.js hot reloads in dev; identical to a module-level Map in production.
 const g = globalThis as any;
 if (!g.__sse_subscribers) g.__sse_subscribers = new Map<string, Set<Subscriber>>();
 const subscribers: Map<string, Set<Subscriber>> = g.__sse_subscribers;
 
-// ── Conversation → CustomerId store ──────────────────────────────────────────
-// Server-side map so we never trust the client-supplied customerId.
-// Keyed by conversationId (UUID), value is the id returned by identify_customer tool.
+// Server-side conversationId → customerId map — never trust the client-supplied ID.
 if (!g.__conv_customer) g.__conv_customer = new Map<string, string>();
 const convCustomer: Map<string, string> = g.__conv_customer;
 
@@ -55,14 +40,14 @@ export function getConvCustomer(conversationId: string): string | null {
   return convCustomer.get(conversationId) ?? null;
 }
 
-// Subscribe a listener to a conversation_id (or "*" for the backoffice)
+// Subscribe to a channel — returns an unsubscribe function
 export function subscribe(channel: string, fn: Subscriber): () => void {
   if (!subscribers.has(channel)) subscribers.set(channel, new Set());
   subscribers.get(channel)!.add(fn);
   return () => subscribers.get(channel)?.delete(fn);
 }
 
-// Publish an event to a specific channel AND to the global backoffice channel
+// Publish to a channel and always mirror to "*" (backoffice)
 export function publish(channel: string, event: SSEEvent) {
   subscribers.get(channel)?.forEach((fn) => fn(event));
   if (channel !== "*") {
