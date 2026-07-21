@@ -26,24 +26,28 @@ app.get("/customers", (_req, res) => {
   res.json(db.prepare("SELECT * FROM customers ORDER BY created_at DESC").all());
 });
 
-// GET /customers/identify?name=Alice%20Johnson&phone=%2B1-555-0101
-// Lookup customer by full name + phone (exact match)
+// GET /customers/identify?name=...&phone=... (kept for backwards compatibility)
+// POST /customers/identify { name, phone }  (preferred — keeps PII out of access logs)
 // MUST be declared before /customers/:id so Express doesn't treat "identify" as an id
-app.get("/customers/identify", (req, res) => {
-  const name = String(req.query.name ?? "").trim();
+function identifyCustomer(name, rawPhone) {
+  const trimmedName = String(name ?? "").trim();
   // '+' is decoded as space by some HTTP clients — normalise to '+<digits>'
-  const rawPhone = String(req.query.phone ?? "");
-  const phone = rawPhone.replace(/^\s+/, "+").trim();
-
-  if (!name || !phone)
-    return res.status(400).json({ error: "name and phone are required" });
-
-  // Normalize both sides to digits only for comparison
+  const phone = String(rawPhone ?? "").replace(/^\s+/, "+").trim();
+  if (!trimmedName || !phone) return null;
   const digitsOnly = (s) => s.replace(/\D/g, "");
   const phoneDigits = digitsOnly(phone);
-  const all = db.prepare("SELECT * FROM customers WHERE name = ?").all(name);
-  const row = all.find((c) => digitsOnly(c.phone) === phoneDigits) ?? null;
+  const all = db.prepare("SELECT * FROM customers WHERE name = ?").all(trimmedName);
+  return all.find((c) => digitsOnly(c.phone) === phoneDigits) ?? null;
+}
 
+app.get("/customers/identify", (req, res) => {
+  const row = identifyCustomer(req.query.name, req.query.phone);
+  if (!row) return res.status(404).json({ error: "Customer not found" });
+  res.json(row);
+});
+
+app.post("/customers/identify", (req, res) => {
+  const row = identifyCustomer(req.body.name, req.body.phone);
   if (!row) return res.status(404).json({ error: "Customer not found" });
   res.json(row);
 });
