@@ -6,8 +6,8 @@
     "node": ">=18.17.0"
   },
   "scripts": {
-    "dev": "NEXT_PUBLIC_INCLUDE_LEFT_SIDEBAR=true NEXT_PUBLIC_INCLUDE_RIGHT_SIDEBAR=true next dev",
-    "build": "NEXT_PUBLIC_INCLUDE_LEFT_SIDEBAR=true NEXT_PUBLIC_INCLUDE_RIGHT_SIDEBAR=true next build",
+    "dev": "NEXT_PUBLIC_INCLUDE_LEFT_SIDEBAR=true NEXT_PUBLIC_INCLUDE_RIGHT_SIDEBAR=false next dev",
+    "build": "NEXT_PUBLIC_INCLUDE_LEFT_SIDEBAR=true NEXT_PUBLIC_INCLUDE_RIGHT_SIDEBAR=false next build",
     "start": "next start",
     "lint": "next lint",
     "dev:full": "npm run dev",

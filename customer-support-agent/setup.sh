@@ -147,9 +147,24 @@ fi
 
 # ── 5. Docker infrastructure ──────────────────────────────────────────────────
 info "Starting Docker containers (CorpDB + MCP docs)..."
+export DOCS_PATH="$SCRIPT_DIR/docs"
+if [[ ! -d "$DOCS_PATH" ]]; then
+  error "docs/ folder not found at $DOCS_PATH — make sure you cloned the full repository."
+fi
+info "Docs path: $DOCS_PATH"
 cd "$SCRIPT_DIR/infra"
-$COMPOSE up -d --build
+# --force-recreate ensures any existing container picks up the correct DOCS_PATH volume
+DOCS_PATH="$DOCS_PATH" $COMPOSE up -d --build --force-recreate
 cd "$SCRIPT_DIR"
+
+# Verify the docs volume mounted correctly inside the container
+info "Verifying docs volume inside mcp-docs container..."
+sleep 3
+DOC_COUNT=$(${SUDO:+$SUDO} docker exec corpbank-mcp-docs ls /docs 2>/dev/null | wc -l || echo 0)
+if [[ "$DOC_COUNT" -eq 0 ]]; then
+  error "docs/ did not mount into the container. Check DOCS_PATH=$DOCS_PATH and re-run setup."
+fi
+success "Docs mounted: $DOC_COUNT file(s) found in /docs"
 
 # Wait for CorpDB
 info "Waiting for CorpDB to be ready..."
@@ -164,16 +179,16 @@ for i in $(seq 1 20); do
   sleep 1
 done
 
-# Wait for MCP docs server
+# Wait for MCP docs server — supergateway exposes /sse, not /health
 info "Waiting for MCP docs server to be ready..."
 for i in $(seq 1 30); do
-  if curl -sf http://localhost:8082/health > /dev/null 2>&1; then
-    success "MCP docs server is up (http://localhost:8082)"
+  if curl -sf --max-time 2 http://localhost:8082/sse > /dev/null 2>&1; then
+    success "MCP docs server is up (http://localhost:8082/sse)"
     break
   fi
   if [[ $i -eq 30 ]]; then
-    warn "MCP server did not respond at /health after 30s — it may still start correctly."
-    warn "Check: $COMPOSE -f infra/docker-compose.yml logs mcp-docs"
+    warn "MCP server did not respond after 30s."
+    warn "Check logs: $COMPOSE logs mcp-docs"
     break
   fi
   sleep 1
@@ -181,7 +196,9 @@ done
 
 # ── 6. npm install ────────────────────────────────────────────────────────────
 info "Installing Node.js dependencies..."
-npm install --prefer-offline 2>&1 | tail -3
+# Remove stale build artifacts — .next built on another machine causes 404s on static chunks
+rm -rf "$SCRIPT_DIR/.next"
+npm install 2>&1 | tail -3
 success "npm install done"
 
 # ── 7. Done ───────────────────────────────────────────────────────────────────

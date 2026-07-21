@@ -58,9 +58,21 @@ interface ConversationHeaderProps {
 
 const UISelector = ({
   redirectToAgent,
+  handoffInitiated,
 }: {
   redirectToAgent: { should_redirect: boolean; reason: string };
+  handoffInitiated?: boolean;
 }) => {
+  // Handoff already created — show a quiet status, no button needed
+  if (handoffInitiated) {
+    return (
+      <p className="mt-2 text-sm text-muted-foreground flex items-center gap-1">
+        <LifeBuoyIcon className="w-3 h-3" />
+        A human agent will be with you shortly.
+      </p>
+    );
+  }
+
   if (redirectToAgent.should_redirect) {
     return (
       <Button
@@ -130,6 +142,7 @@ const MessageContent = ({
     user_mood?: string;
     suggested_questions?: string[];
     redirect_to_agent?: { should_redirect: boolean; reason: string };
+    handoff_initiated?: boolean;
     debug?: {
       context_used: boolean;
     };
@@ -142,7 +155,7 @@ const MessageContent = ({
     const timer = setTimeout(() => {
       setError(true);
       setThinking(false);
-    }, 30000);
+    }, 90000);
 
     try {
       const result = JSON.parse(content);
@@ -187,8 +200,11 @@ const MessageContent = ({
       >
         {parsed.response || content}
       </ReactMarkdown>
-      {parsed.redirect_to_agent && (
-        <UISelector redirectToAgent={parsed.redirect_to_agent} />
+      {(parsed.redirect_to_agent || parsed.handoff_initiated) && (
+        <UISelector
+          redirectToAgent={parsed.redirect_to_agent ?? { should_redirect: false, reason: "" }}
+          handoffInitiated={parsed.handoff_initiated}
+        />
       )}
     </>
   );
@@ -210,24 +226,13 @@ interface ConversationHeaderProps {
   setSelectedModel: (modelId: string) => void;
   models: Model[];
   showAvatar: boolean;
-  selectedKnowledgeBase: string;
-  setSelectedKnowledgeBase: (knowledgeBaseId: string) => void;
-  knowledgeBases: KnowledgeBase[];
 }
-
-type KnowledgeBase = {
-  id: string;
-  name: string;
-};
 
 const ConversationHeader: React.FC<ConversationHeaderProps> = ({
   selectedModel,
   setSelectedModel,
   models,
   showAvatar,
-  selectedKnowledgeBase,
-  setSelectedKnowledgeBase,
-  knowledgeBases,
 }) => (
   <div className="p-0 flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 animate-fade-in">
     <div className="flex items-center space-x-4 mb-2 sm:mb-0">
@@ -272,29 +277,6 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-grow text-muted-foreground  sm:flex-grow-0"
-          >
-            {knowledgeBases.find((kb) => kb.id === selectedKnowledgeBase)
-              ?.name || "Select KB"}
-            <ChevronDown className="ml-2 h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          {knowledgeBases.map((kb) => (
-            <DropdownMenuItem
-              key={kb.id}
-              onSelect={() => setSelectedKnowledgeBase(kb.id)}
-            >
-              {kb.name}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   </div>
 );
@@ -309,6 +291,7 @@ function ChatArea() {
   const [selectedModel, setSelectedModel] = useState("us.anthropic.claude-opus-4-8");
   const [showAvatar, setShowAvatar] = useState(false);
   const [handoffMode, setHandoffMode] = useState(false); // when true, messages bypass the AI and go to the human agent
+  const [chatClosed, setChatClosed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
   // Restore conversation from sessionStorage after hydration to survive page refreshes
@@ -339,15 +322,6 @@ function ChatArea() {
   }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState(
-    "your-knowledge-base-id",
-  );
-
-  const knowledgeBases: KnowledgeBase[] = [
-    { id: "your-knowledge-base-id", name: "Your KB Name" },
-    // Add more knowledge bases as needed
-  ];
-
   const models: Model[] = [
     { id: "us.anthropic.claude-opus-4-8", name: "Claude Opus 4.8" },
     { id: "us.anthropic.claude-haiku-4-5-20251001-v1:0", name: "Claude Haiku 4.5" },
@@ -447,10 +421,22 @@ function ChatArea() {
     es.addEventListener("loan_resolved", (e) => {
       const { decision, reason, amount } = JSON.parse(e.data);
       const amountStr = amount ? ` Amount approved: **$${Number(amount).toLocaleString()}**.` : "";
-      addMsg(
-        `Your request has been **${decision}**.${amountStr}${reason ? ` Reason: ${reason}` : ""}`,
-        { user_mood: decision === "approved" ? "positive" : "negative" }
-      );
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: JSON.stringify({
+          response: `Your request has been **${decision}**.${amountStr}${reason ? ` Reason: ${reason}` : ""}`,
+          thinking: "",
+          user_mood: decision === "approved" ? "positive" : "negative",
+          suggested_questions: [
+            "Is there anything else I can help you with?",
+            "What are my current account balances?",
+            "No, that's all — thank you!",
+          ],
+          redirect_to_agent: { should_redirect: false },
+          debug: { context_used: false },
+        }),
+      }]);
       setHandoffMode(false);
     });
 
@@ -658,7 +644,29 @@ function ChatArea() {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 300)}px`;
   };
 
+  const CLOSE_PHRASES = ["no, that's all", "that's all", "no, thanks", "goodbye", "encerrar"];
+
   const handleSuggestedQuestionClick = (question: string) => {
+    if (CLOSE_PHRASES.some((p) => question.toLowerCase().includes(p))) {
+      setMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role: "user", content: question },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: JSON.stringify({
+            response: "Thank you for contacting CorpBank. Have a great day!",
+            thinking: "",
+            user_mood: "positive",
+            suggested_questions: [],
+            redirect_to_agent: { should_redirect: false },
+            debug: { context_used: false },
+          }),
+        },
+      ]);
+      setChatClosed(true);
+      return;
+    }
     handleSubmit(question);
   };
 
@@ -692,9 +700,6 @@ function ChatArea() {
               setSelectedModel={setSelectedModel}
               models={models}
               showAvatar={showAvatar}
-              selectedKnowledgeBase={selectedKnowledgeBase}
-              setSelectedKnowledgeBase={setSelectedKnowledgeBase}
-              knowledgeBases={knowledgeBases}
             />
           </div>
           {messages.length > 0 && (
@@ -781,7 +786,7 @@ function ChatArea() {
                       />
                     </div>
                   </div>
-                  {message.role === "assistant" && (
+                  {message.role === "assistant" && !handoffMode && (
                     <SuggestedQuestions
                       questions={
                         JSON.parse(message.content).suggested_questions || []
@@ -835,8 +840,8 @@ function ChatArea() {
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={handoffMode ? "Message human agent..." : "Type your message here..."}
-            disabled={isLoading}
+            placeholder={chatClosed ? "This conversation has ended." : handoffMode ? "Message human agent..." : "Type your message here..."}
+            disabled={isLoading || chatClosed}
             className="resize-none min-h-[44px] bg-background  border-0 p-3 rounded-xl shadow-none focus-visible:ring-0"
             rows={1}
           />
@@ -852,7 +857,7 @@ function ChatArea() {
             </div>
             <Button
               type="submit"
-              disabled={isLoading || input.trim() === ""}
+              disabled={isLoading || chatClosed || input.trim() === ""}
               className="gap-2"
               size="sm"
             >
