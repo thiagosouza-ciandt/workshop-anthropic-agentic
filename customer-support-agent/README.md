@@ -52,6 +52,10 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 | Real-time | Server-Sent Events (SSE) |
 | Validation | Zod |
 
+### Lab Case - Customer Support Multi-agents
+
+![Customer Support Case](tutorial/customer-support-workshop-case.png)
+
 ---
 
 ## 2. Schedule
