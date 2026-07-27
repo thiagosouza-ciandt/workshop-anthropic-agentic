@@ -2,7 +2,7 @@
 
 Build a production-style customer support system from a single API call to a full multi-agent architecture with real data, document search, and live human handoff.
 
-![Customer Support Case](customer-support-agent/tutorial/customer-support-workshop-case.png)
+![Customer Support Case](/tutorial/customer-support-workshop-case.png)
 
 ---
 
