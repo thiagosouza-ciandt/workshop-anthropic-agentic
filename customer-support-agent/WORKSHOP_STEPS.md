@@ -2,6 +2,8 @@
 
 Build a production-style customer support system from a single API call to a full multi-agent architecture with real data, document search, and live human handoff.
 
+![Customer Support Case](customer-support-agent/tutorial/customer-support-workshop-case.png)
+
 ---
 
 ## Before you start
@@ -53,15 +55,12 @@ Customer message
 
 ```
 app/
-  api/chat/
-    route_baseline.ts   ← starting point — read only
-    route.ts            ← replace this in Step 4
   lib/agents/
-    customer-data.ts    ← create in Step 3
-    billing.ts          ← create in Step 3
-    payments.ts         ← create in Step 3
-    coordinator.ts      ← create in Step 4
-    mcp-docs.ts         ← already exists — do not touch
+    customer-data.ts 
+    billing.ts        
+    payments.ts        
+    coordinator.ts      
+    mcp-docs.ts         
 ```
 
 ---
@@ -74,7 +73,6 @@ app/
 
 ---
 
-`app/api/chat/route_baseline.ts` is your starting point and is already active as `route.ts`.
 
 Open `http://localhost:3000` and send:
 
@@ -118,9 +116,34 @@ const responseSchema = z.object({
 
 ### Try it
 
-Change the bank name in `SYSTEM_PROMPT` from `CorpBank` to anything. Save — the agent introduces itself with the new name immediately.
+1 - Change the bank name in `SYSTEM_PROMPT` from `CorpBank` to anything. Save — the agent introduces itself with the new name immediately.
 
+2 -  Add some ground rules
 ---
+
+You can help with:
+- Account balance and transaction history
+- Bills and invoices
+- Loan requests
+- Credit limit questions
+- General questions about bank products
+
+IMPORTANT RULES:
+- You do NOT have access to customer data yet — you cannot look up balances, bills, or loans.
+- Never ask the customer to log in, use an app, or go through any authentication process.
+- When the customer asks for account data, acknowledge the request and let them know
+  this capability will be available soon.
+- If the customer explicitly asks to speak with a human, signal a redirection.
+
+IMPORTANT: Always respond as a valid JSON object:
+{
+  "thinking": "your internal reasoning about how to respond",
+  "response": "your response to the customer",
+  "user_mood": "positive|neutral|negative|curious|frustrated|confused",
+  "suggested_questions": ["Suggested question 1?", "Suggested question 2?"],
+  "redirect_to_agent": { "should_redirect": false },
+  "debug": { "context_used": false }
+}
 
 ---
 
