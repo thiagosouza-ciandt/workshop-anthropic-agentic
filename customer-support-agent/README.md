@@ -3,9 +3,9 @@
 
 ---
 
-> **Workshop focus:** Everything you need to build is in `app/api/chat/route.ts` and a handful of new files you create during the sessions. The frontend, database, Docker infrastructure, and backoffice UI are **already set up and running** — they exist to make the agent feel real, not to be studied. You don't need to understand or modify them.
+> **Workshop focus:** Everything you need to build is in `app/lib/agents/` — a handful of files you create during the sessions. The frontend, database, Docker infrastructure, and backoffice UI are **already set up and running** — they exist to make the agent feel real, not to be studied.
 >
-> The sections on Architecture, SSE, Database, and File Reference are **informational only** — context for the curious. The workbook (`WORKSHOP_STEPS.md`) is where the hands-on work happens.
+> The sections on Architecture, Tools, and the Agentic Loop are **informational reference**. The hands-on work is in [`WORKSHOP_STEPS.md`](WORKSHOP_STEPS.md).
 
 ---
 
@@ -14,7 +14,7 @@
 1. [Project Overview](#1-project-overview)
 2. [Schedule](#2-schedule)
 3. [Architecture](#3-architecture)
-4. [What is a Router Agent?](#4-what-is-a-router-agent)
+4. [Coordinator Pattern](#4-coordinator-pattern)
 5. [Tools](#5-tools)
 6. [The Agentic Loop](#6-the-agentic-loop)
 7. [Escalate to Human (Human-in-the-Loop)](#7-escalate-to-human-human-in-the-loop)
@@ -28,17 +28,17 @@
 
 ## 1. Project Overview
 
-CorpBank is a fictional bank customer support system built to demonstrate **multi-agent AI patterns** using Claude via Amazon Bedrock. The system allows a customer to chat with an AI agent that can query real data, handle loan requests, search internal policy documents, and transfer the conversation to a human agent when needed — all in real time. All these lessons would be able to practice following this [Workbook](WORKSHOP_STEPS.md)
+CorpBank is a fictional bank customer support system built to demonstrate **multi-agent AI patterns** using Claude via Amazon Bedrock. A customer chats with an AI agent that can query real data, handle loan requests, search internal policy documents, and transfer the conversation to a human agent in real time.
 
 ### What participants will learn
 
-- How to build an agent that calls tools (functions) to get real data
+- How to call Claude and enforce structured JSON output with Zod
+- Why the messages array is the only memory (Claude is stateless)
 - How to define tool schemas so Claude knows when and how to use them
-- How to implement the agentic loop — the while loop that keeps Claude working until it finishes
+- How to implement the agentic loop — the `while` loop that keeps Claude working until it finishes
+- How to build specialist agents and orchestrate them with a Coordinator
 - How to connect an agent to external document sources via MCP
-- How to escalate to a human agent with full context transfer
-- How to stream events in real time between the agent, the customer, and the backoffice
-- How to prevent prompt injection and unauthorized access
+- How to escalate to a human agent with full context transfer in real time
 
 ### Stack
 
@@ -47,8 +47,8 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 | Frontend | Next.js 14 + React + TypeScript |
 | UI Components | shadcn/ui + Tailwind CSS |
 | LLM | Claude via Amazon Bedrock (`@anthropic-ai/bedrock-sdk`) |
-| Database API | SQLite + Express (Docker) |
-| Document search | MCP filesystem server (`@modelcontextprotocol/sdk`) |
+| Database API | SQLite + Express (Docker, port 3001) |
+| Document search | MCP filesystem server via `supergateway` (Docker, port 8082) |
 | Real-time | Server-Sent Events (SSE) |
 | Validation | Zod |
 
@@ -56,46 +56,49 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 
 ## 2. Schedule
 
-| Step | Duration | What you build | Anthropic concepts |
-|---|---|---|---|
-| 1 — Base Agent | 20 min | System prompt, structured output, Bedrock client | System prompt, structured output, Zod |
-| 2 — Tool Calling | 30 min | DB helpers, tool definitions, agentic loop | Tools, agentic loop, stop_reason |
-| 3 — Subagents | 30 min | Coordinator + 3 specialist agents | Multi-agent orchestration, delegation |
-| 4 — MCP | 20 min | Internal document search via MCP filesystem | Model Context Protocol |
-| 5 — Human-in-the-loop | 40 min | Real-time handoff, backoffice, SSE | Escalation patterns, human oversight |
+| Step | Duration | What you build |
+|---|---|---|
+| 1 — Basic Agent | ~15 min | Single API call, system prompt, structured JSON output |
+| 2 — Multi-turn Conversation | ~15 min | Understand statelessness and the messages array |
+| 3 — Specialist Agents | ~25 min | CustomerData, Billing, Payments — each with own tools and loop |
+| 4 — Orchestration | ~25 min | Coordinator delegates to specialists via tool-calling |
+| 5 — MCP | ~20 min | Policy document search via MCP filesystem server |
+| 6 — Human-in-the-Loop | ~20 min | Real-time handoff, backoffice, SSE |
 
-**Total: ~2h 20min**
-
-> Steps 1–4 focus on core Anthropic patterns. Step 5 adds the human oversight layer using SSE (a web standard, not Anthropic-specific).
+**Total: ~2h**
 
 ---
 
 ## 3. Architecture
 
 ```
-Customer browser  ──────────────────────────────────► localhost:3000/
+Customer browser  ─────────────────────────────────► localhost:3000/
                                                           │
                                                     Next.js API
                                                     /api/chat
+                                                    (route.ts)
                                                           │
                                               ┌───────────▼──────────────┐
-                                              │     Router Agent          │
-                                              │   (Claude via Bedrock)    │
+                                              │       Coordinator         │
+                                              │    (Claude via Bedrock)   │
                                               │                           │
-                                              │  Tools:                   │
-                                              │  • identify_customer      │
-                                              │  • get_accounts           │
-                                              │  • get_bills              │
-                                              │  • get_transactions       │
-                                              │  • get_credit             │
-                                              │  • request_loan           │
+                                              │  Delegates to:            │
+                                              │  • CustomerData Agent     │
+                                              │  • Billing Agent          │
+                                              │  • Payments Agent         │
                                               │  • search_docs (MCP)      │
                                               │  • escalate_to_human      │
-                                              └──────┬──────────┬─────────┘
-                                                     │          │
-                                               CorpDB API    MCP server
-                                              (SQLite REST)  (docs/ folder)
-                                             localhost:3001  subprocess
+                                              └──┬──────┬──────┬──────────┘
+                                                 │      │      │
+                                          CustomerData  │   Payments
+                                             Agent    Billing  Agent
+                                               │      Agent     │
+                                               └──────┬─────────┘
+                                                      │
+                                               CorpDB API          MCP server
+                                              (SQLite REST)       (docs/ folder)
+                                             localhost:3001      localhost:8082/sse
+                                                                    (Docker SSE)
 
 Backoffice browser ─────────────────────────► localhost:3000/backoffice
                         SSE (/api/stream)          │
@@ -108,46 +111,42 @@ Backoffice browser ────────────────────�
 | URL | Who uses it | Purpose |
 |---|---|---|
 | `localhost:3000` | Customer | Chat with the AI agent |
-| `localhost:3000/backoffice` | Human agent | See handoffs, chat with customer, approve/reject |
+| `localhost:3000/backoffice` | Human agent | See handoffs, chat with customer, approve/reject loans |
 | `localhost:3000/db` | Developer | CRUD interface for the database |
 
 ---
 
-## 4. What is a Router Agent?
+## 4. Coordinator Pattern
 
-A **Router Agent** is an AI agent that acts as the single entry point for user requests. Instead of doing everything itself, it:
+The **Coordinator** is a Claude agent that acts as the single entry point for customer requests. Instead of handling everything itself, it:
 
-1. **Understands** the user's intent from natural language
-2. **Decides** which tool or action to invoke
-3. **Executes** the tool and interprets the result
-4. **Responds** in a structured format the frontend can render
-5. **Escalates** when the request is beyond its authority
+1. **Reads** the customer's message and conversation history
+2. **Decides** which specialist agent should handle the request
+3. **Delegates** by calling `delegate_customer_data`, `delegate_billing`, or `delegate_payments` as tools
+4. **Synthesizes** the specialist responses into one coherent reply
+5. **Escalates** when the request exceeds the agent's authority
 
-In this project, the router agent is Claude. It receives the customer's message and decides in real time whether to query the database, search documents, submit a loan, or transfer to a human — all by calling tools.
+The specialist agents (CustomerData, Billing, Payments) are themselves Claude instances, each with their own system prompt, tools, and agentic loop — scoped to their domain.
 
-### Why a router pattern?
+### Why a Coordinator instead of one big agent?
 
-Without a router, you would need to write `if/else` logic to handle every possible user input. With a router agent, Claude reads the conversation and decides what to do based on the tool descriptions you provide. The agent's behavior is controlled by:
+With a single flat agent, improving loan logic can accidentally break account balance behavior. Specialist agents are independently tunable. The Coordinator's behavior is controlled by:
 
-- The **system prompt** — defines identity, scope, and rules
-- The **tool definitions** — describe what each function does and when to use it
-- The **conversation history** — gives context for each decision
+- The **system prompt** — defines which agents exist and when to call them
+- The **tool descriptions** — describe what each specialist handles
+- The **conversation history** — gives context for routing decisions
 
-### The system prompt (abbreviated)
+### The coordinator's tools
 
+```typescript
+delegate_customer_data  → runs runCustomerDataAgent()  // identity, balances, transactions
+delegate_billing        → runs runBillingAgent()        // bills and invoices
+delegate_payments       → runs runPaymentsAgent()       // credit limits and loans
+search_docs             → calls searchDocs() via MCP    // internal policy documents
+escalate_to_human       → signals route.ts to create handoff + publish SSE event
 ```
-You are a virtual customer support assistant for CorpBank.
 
-RULES:
-1. When the customer provides their name and phone, call identify_customer immediately.
-2. Use tools to answer financial questions — never make up numbers.
-3. For loans: always check get_credit first. Deny if above credit limit.
-   Offer escalation to human for exceptions.
-4. For loans above $500 within the limit: register with request_loan, ask for
-   confirmation, then escalate if confirmed.
-5. For policy/rate questions: use search_docs — never invent numbers.
-6. For everything else requiring approval: respond that you lack the authority.
-```
+> **The specialist agents are tools.** Calling another Claude agent uses the exact same tool-calling mechanism as calling a database. There is no special multi-agent API.
 
 ---
 
@@ -171,45 +170,50 @@ Tools are functions you expose to Claude. Claude reads the `name` and `descripti
 
 > **The `description` is the most important field.** Claude never sees the implementation — only the description. A vague description leads to wrong or missing tool calls.
 
-### Tools in this project
+### Coordinator tools (what the Coordinator sees)
 
-| Tool | Data source | Purpose |
+| Tool | Routes to | Purpose |
 |---|---|---|
-| `identify_customer` | CorpDB | Match customer by name + phone |
-| `get_accounts` | CorpDB | All account balances |
-| `get_bills` | CorpDB | Open or paid bills/invoices |
-| `get_transactions` | CorpDB | Account statement |
-| `get_credit` | CorpDB | Credit limit and availability |
-| `request_loan` | CorpDB | Submit a loan (auto-approved ≤ $500, pending > $500) |
-| `search_docs` | MCP filesystem | Search internal policy documents |
-| `escalate_to_human` | SSE + CorpDB | Transfer conversation to a human agent |
+| `delegate_customer_data` | CustomerData Agent | Identity, account balances, transaction history |
+| `delegate_billing` | Billing Agent | Open bills, overdue invoices, due dates |
+| `delegate_payments` | Payments Agent | Credit limits, loan applications |
+| `search_docs` | MCP filesystem | Internal policy documents (rates, fees, eligibility) |
+| `escalate_to_human` | route.ts → SSE | Transfer conversation to a human agent |
+
+### Specialist agent tools (what each specialist uses)
+
+| Agent | Tools |
+|---|---|
+| CustomerData | `identify_customer`, `get_accounts`, `get_transactions` |
+| Billing | `get_bills` |
+| Payments | `get_credit`, `request_loan` |
 
 ### Credit limit enforcement
 
-The agent checks `get_credit` before processing any loan request:
+The Payments agent checks `get_credit` before processing any loan:
 
 | Scenario | Agent behavior |
 |---|---|
-| Amount ≤ credit limit AND ≤ $500 | Approve automatically |
-| Amount ≤ credit limit AND > $500 | Register as pending, ask confirmation, escalate |
-| Amount > credit limit | Deny, explain reason, offer exception via human |
+| Amount ≤ credit limit AND ≤ $500 | Call `request_loan` — auto-approved |
+| Amount ≤ credit limit AND > $500 | Call `request_loan` as pending, ask confirmation, escalate if confirmed |
+| Amount > credit limit | Decline, explain reason, offer exception via human |
 
 ---
 
 ## 6. The Agentic Loop
 
-The agentic loop is the `while (true)` that keeps Claude working until it finishes. This is the core pattern of any tool-calling agent.
+The agentic loop is the `while (true)` that keeps Claude working until it finishes. Every specialist agent uses this pattern.
 
 ```typescript
 while (true) {
   const response = await anthropic.messages.create({ model, system, tools, messages });
 
   if (response.stop_reason === "end_turn") {
-    return extractText(response.content); // Claude finished
+    return extractText(response.content); // Claude finished — return the answer
   }
 
   if (response.stop_reason === "tool_use") {
-    // Execute each tool Claude requested, feed results back, loop
+    // Execute each tool Claude requested, feed results back, loop again
     messages.push({ role: "assistant", content: response.content });
     const results = await executeAllTools(response.content);
     messages.push({ role: "user", content: results });
@@ -225,23 +229,29 @@ while (true) {
 | `"tool_use"` | Claude wants to call one or more tools — execute and loop |
 | `"max_tokens"` | Response was cut off — increase `max_tokens` |
 
+Without the loop, Claude requests a tool but your code never sends the result back, so Claude never composes the final answer.
+
 ---
 
 ## 7. Escalate to Human (Human-in-the-Loop)
 
-When a loan requires human approval, a customer is frustrated, or an exception is requested, the agent transfers the full conversation to a human agent (a **handoff**).
+When a loan requires human approval or a customer demands it, the Coordinator transfers the full conversation to a human agent (a **handoff**).
+
+### Separation of concerns
+
+The Coordinator **signals** escalation by capturing `escalation = input` when `escalate_to_human` is called. `route.ts` **executes** the infrastructure side: creating the database record and publishing the SSE event. This means changing from SSE to WebSockets, or swapping the database, requires no changes to the Coordinator.
 
 ### Handoff flow
 
 ```
-1. Agent detects escalation trigger
-2. Agent calls escalate_to_human → { customer_id, loan_id?, reason }
-3. route.ts checks for duplicate open handoff (deduplication)
+1. Coordinator captures escalation signal
+2. route.ts deduplicates — skips if a waiting handoff already exists for this conversation
+3. route.ts resolves the customer record (by ID, then falls back to name+phone lookup)
 4. POST /handoffs → CorpDB creates record with full conversation context
 5. publish("*", handoff_created) → backoffice receives via SSE instantly
 6. Customer chat enters "handoff mode" — messages go to human, not Claude
-7. Human reads context, types reply → SSE pushes to customer chat
-8. Human approves/rejects with amount → customer receives decision via SSE
+7. Human reads context, types reply → SSE pushes to customer chat in real time
+8. Human approves/rejects → customer receives decision via SSE + suggested next steps
 9. Human clicks "Return to AI" → handoff resolved, customer back to Claude
 ```
 
@@ -249,13 +259,9 @@ When a loan requires human approval, a customer is frustrated, or an exception i
 
 Every handoff includes:
 - Full conversation history
-- Agent's internal reasoning (`thinking`)
+- Coordinator's internal reasoning (`thinking`)
 - Customer summary (name, credit limit)
 - Loan ID and amount (pre-filled in the decision form)
-
-### Real-time delivery
-
-Events between the agent, customer, and backoffice are pushed via **Server-Sent Events (SSE)** — a standard browser protocol where the server keeps a connection open and pushes events without polling. Not an Anthropic concept, but the mechanism that makes the handoff feel instant.
 
 ---
 
@@ -263,7 +269,7 @@ Events between the agent, customer, and backoffice are pushed via **Server-Sent 
 
 **Model Context Protocol (MCP)** is an open standard for connecting AI agents to external data sources without writing custom integrations for each one.
 
-In this project, an MCP filesystem server exposes the `docs/` folder as a Docker container. When the customer asks about rates, fees, or policies, the agent calls `search_docs` and returns accurate, sourced information.
+In this project, an MCP filesystem server exposes the `docs/` folder as a Docker container. When the customer asks about rates, fees, or policies, the Coordinator calls `search_docs` and returns accurate, sourced information.
 
 ### Documents
 
@@ -276,7 +282,7 @@ In this project, an MCP filesystem server exposes the `docs/` folder as a Docker
 
 ### Infrastructure
 
-The MCP server runs as a Docker container (`corpbank-mcp-docs`) using [supergateway](https://github.com/supercorp-ai/supergateway), which wraps the `@modelcontextprotocol/server-filesystem` stdio process and exposes it as **SSE** on port `8082`. The `docs/` folder is mounted as a read-only volume.
+The MCP server runs as a Docker container (`corpbank-mcp-docs`) using [supergateway](https://github.com/supercorp-ai/supergateway), which wraps `@modelcontextprotocol/server-filesystem` (stdio) and exposes it as **HTTP SSE** on port `8082`. The `docs/` folder is mounted as a read-only volume.
 
 ```
 docker-compose.yml
@@ -289,29 +295,27 @@ docker-compose.yml
 ### How the MCP client works
 
 ```typescript
-// Connects via SSE — no subprocess spawned by the app
+// Connects via SSE — Docker handles the stdio subprocess internally
 const transport = new SSEClientTransport(new URL(MCP_DOCS_URL));
 const client = new Client({ name: "corpbank-docs", version: "1.0.0" });
 await client.connect(transport);
 
-// Agent calls these — identical regardless of transport:
-const { resources } = await client.listResources();  // list all docs
-const { contents } = await client.readResource({ uri }); // read one doc
+// List files and read content — identical calls regardless of the transport:
+await client.callTool({ name: "list_directory", arguments: { path: "/docs" } });
+await client.callTool({ name: "read_text_file", arguments: { path: "/docs/loan-policy.md" } });
 ```
 
-> To connect to Google Drive, Notion, or Confluence instead — swap the Docker image and set `MCP_DOCS_URL` in `.env.local`. The `listResources` and `readResource` calls stay identical.
+> To connect to Google Drive, Notion, or Confluence instead — swap the Docker image and set `MCP_DOCS_URL` in `.env.local`. The agent code does not change.
 
 ---
 
 ## 9. Prompt Attack Prevention
 
-### Mitigations applied
-
 | Mitigation | Implementation |
 |---|---|
-| Customer ID server-side only | `getConvCustomer(conversationId)` — never from request body |
-| Prompt injection via ID | Regex allowlist `/^[A-Za-z0-9_-]{1,64}$/` before interpolation |
-| Backoffice endpoint auth | `x-backoffice-secret` header required for PATCH + POST (human actions) |
+| Path traversal via LLM-generated IDs | `validateId()` checks `/^[a-zA-Z0-9_-]+$/` before every URL interpolation |
+| PII in access logs | `identify_customer` uses `POST /customers/identify` — name and phone go in the body, not the URL |
+| Backoffice endpoint auth | `x-backoffice-secret` header required for all human-action endpoints |
 | Identity spoofing | `from` and `resolved_by` set server-side, never from client |
 | Escalation scope | System prompt explicitly lists the two allowed escalation triggers |
 
@@ -325,36 +329,35 @@ const { contents } = await client.readResource({ uri }); // read one doc
 - Docker + Docker Compose
 - AWS account with Bedrock access (`AmazonBedrockFullAccess` IAM permission)
 
-### Environment
+### Quickstart
 
-Create `.env.local` in the project root:
+```bash
+# 1. Run setup — installs deps, starts Docker, creates .env.local template
+./setup.sh
+
+# 2. Add your Bedrock token to .env.local
+# AWS_BEARER_TOKEN_BEDROCK=<your-token>
+
+# 3. Start the app
+npm run dev
+```
+
+### Environment variables (`.env.local`)
 
 ```bash
 AWS_REGION=us-east-1
+AWS_BEARER_TOKEN_BEDROCK=<your-token>
 BACKOFFICE_SECRET=workshop
 CORPDB_URL=http://localhost:3001
 MCP_DOCS_URL=http://localhost:8082/sse
 ```
 
-### Start the infrastructure
+### Verify infrastructure
 
-```bash
-cd infra
-docker compose up -d
-```
-
-Verify:
 ```bash
 curl http://localhost:3001/health     # {"status":"ok"}
-curl http://localhost:3001/customers  # returns seed customers
-curl http://localhost:8082/health     # MCP docs server
-```
-
-### Start the app
-
-```bash
-npm install
-npm run dev
+curl http://localhost:3001/customers  # returns the four seed customers
+curl -s http://localhost:8082/sse     # MCP docs server — returns SSE stream
 ```
 
 ### URLs
@@ -367,23 +370,23 @@ npm run dev
 
 ### Test customers
 
-| Name | Phone | Credit Limit | Scenario |
+| Name | Phone | Credit Limit | Good for |
 |---|---|---|---|
-| Alice Johnson | +1-555-0101 | $2,000 | Open bills, good history |
-| Bob Smith | +1-555-0102 | $500 | Overdue bills, low limit |
-| Carol Martinez | +1-555-0103 | $10,000 | VIP, all paid |
-| David Lee | +1-555-0104 | $300 | Low credit limit — good for testing denials |
+| Alice Johnson | +1-555-0101 | $2,000 | Balance queries, open bills |
+| Bob Smith | +1-555-0102 | $500 | Overdue bills, low credit |
+| Carol Martinez | +1-555-0103 | $10,000 | VIP, large pending loans |
+| David Lee | +1-555-0104 | $500 | Loan denial ($600 exceeds limit) |
 
 ### Session management
 
-- **New session:** click "New session" in the chat header — clears session storage and starts fresh
-- **Reset database:** `docker compose down -v && docker compose up -d`
+- **New session:** click "New session" in the chat header
+- **Reset database:** `cd infra && docker compose down -v && docker compose up -d`
 
 ---
 
 ## 11. Database & API Contract
 
-SQLite REST API (Docker, port 3001). Full contract: `infra/API_CONTRACT.md`
+SQLite REST API (Docker, port 3001). Full contract: [`infra/API_CONTRACT.md`](infra/API_CONTRACT.md)
 
 ### Tables
 
@@ -399,14 +402,15 @@ SQLite REST API (Docker, port 3001). Full contract: `infra/API_CONTRACT.md`
 ### Key endpoints
 
 ```
-GET  /customers/identify?name=Alice+Johnson&phone=+1-555-0101
+POST /customers/identify            { name, phone }          ← preferred (PII in body)
+GET  /customers/identify?name=&phone=                        ← legacy (PII in URL)
 GET  /accounts/:customerId
 GET  /bills/:customerId?paid=0
 GET  /credit/:customerId
-POST /loans                     { customer_id, amount }
-POST /handoffs                  { conversation_id, customer_id, loan_id, context }
+POST /loans                         { customer_id, amount }
+POST /handoffs                      { conversation_id, customer_id, loan_id, context }
 GET  /handoffs?status=waiting
-PATCH /loans/:id/resolve        { decision, resolved_by, reason }
+PATCH /loans/:id/resolve            { decision, resolved_by, reason }
 PATCH /handoffs/:id/resolve
 ```
 
@@ -419,40 +423,38 @@ customer-support-agent/
 │
 ├── app/
 │   ├── api/
-│   │   ├── chat/
-│   │   │   ├── route.ts           ← Main agent (router) — edit this during workshop
-│   │   │   └── route_baseline.ts  ← Step 1 starting point (no tools)
-│   │   ├── db/[...path]/route.ts  ← Proxy to CorpDB (avoids CORS)
-│   │   ├── handoff/route.ts       ← Human sends messages + approves/rejects
-│   │   └── stream/route.ts        ← SSE endpoint (EventSource target)
-│   ├── backoffice/page.tsx        ← Human agent UI
-│   ├── db/page.tsx                ← Database CRUD interface
-│   └── lib/
-│       ├── agents/
-│       │   ├── mcp-docs.ts        ← MCP client for document search (Step 4)
-│       │   ├── customer-data.ts   ← Customer data specialist (Step 3)
-│       │   ├── billing.ts         ← Billing specialist (Step 3)
-│       │   ├── payments.ts        ← Payments specialist (Step 3)
-│       │   └── coordinator.ts     ← Orchestrator (Step 3)
-│       └── sse-store.ts           ← In-memory pub/sub + conv→customer map
+│   │   ├── chat/route.ts              ← HTTP entry point — calls Coordinator, handles handoffs
+│   │   ├── db/[...path]/route.ts      ← Proxy to CorpDB (avoids CORS in browser)
+│   │   ├── handoff/route.ts           ← Human sends messages + approves/rejects loans
+│   │   └── stream/route.ts            ← SSE endpoint (EventSource target)
+│   ├── backoffice/page.tsx            ← Human agent UI
+│   ├── db/page.tsx                    ← Database CRUD interface
+│   └── lib/agents/
+│       ├── coordinator.ts             ← Workshop stub → replace with Step 4 implementation
+│       └── mcp-docs.ts                ← MCP client for document search (already complete)
+│
+├── tutorial/                          ← Reference implementations (read-only during workshop)
+│   ├── customer-data.ts               ← CustomerData Agent — Step 3 solution
+│   ├── billing.ts                     ← Billing Agent — Step 3 solution
+│   ├── payments.ts                    ← Payments Agent — Step 3 solution
+│   └── coordinator.ts                 ← Coordinator — Step 4 solution
 │
 ├── components/
-│   └── ChatArea.tsx               ← Customer chat UI + SSE client
+│   └── ChatArea.tsx                   ← Customer chat UI + SSE client
 │
-├── docs/                          ← CorpBank internal policy documents (MCP source)
+├── docs/                              ← CorpBank internal policy documents (MCP source)
 │   ├── loan-policy.md
 │   ├── credit-limit-policy.md
 │   ├── faq.md
 │   └── products.md
 │
 ├── infra/
-│   ├── docker-compose.yml         ← Starts CorpDB container
-│   ├── API_CONTRACT.md            ← Full REST API documentation
+│   ├── docker-compose.yml             ← Starts CorpDB (3001) and MCP docs (8082) containers
+│   ├── API_CONTRACT.md                ← Full REST API documentation
 │   └── sqlite-api/
-│       ├── server.js              ← Express REST API
-│       └── seed.js                ← Schema + synthetic data
+│       ├── server.js                  ← Express REST API
+│       └── seed.js                    ← Schema + synthetic customer data
 │
-├── WORKSHOP.md                    ← Conceptual reference (what & why)
-├── WORKSHOP_STEPS.md              ← Step-by-step guide (copy-paste workbook)
-│
+├── WORKSHOP_STEPS.md                  ← Step-by-step workbook (hands-on)
+└── README.md                          ← Architecture reference (this file)
 ```
