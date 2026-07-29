@@ -9,10 +9,10 @@ Build a production-style customer support system from a single API call to a ful
 ## Before you start
 
 ```bash
-# 1. Clone and enter the project
-cd customer-support-agent
+# 1. Clone and enter the project (Clone can be skiped if the environment is ready to use)
+cd ~/Downloads/workshop-anthropic-agentic/customer-support-agent$ 
 
-# 2. Run setup — installs deps, starts Docker infra, creates .env.local
+# 2. Run setup — installs deps, starts Docker infra, creates .env.local (setup can be skiped if the environment is ready to use)
 ./setup.sh
 
 # 3. Fill in your Bedrock token in .env.local
