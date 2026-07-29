@@ -207,7 +207,17 @@ rm -rf "$SCRIPT_DIR/.next"
 npm install 2>&1 | tail -3
 success "npm install done"
 
-# ── 7. Done ───────────────────────────────────────────────────────────────────
+# ── 7. Multi-user permissions ─────────────────────────────────────────────────
+# Allow any user to write only the build/cache dirs — credentials stay protected
+info "Setting permissions for multi-user access..."
+mkdir -p "$SCRIPT_DIR/.next" "$SCRIPT_DIR/node_modules/.cache"
+chmod -R a+rwx "$SCRIPT_DIR/.next"
+chmod -R a+rwx "$SCRIPT_DIR/node_modules/.cache"
+# Harden credential file so only the owner can read it
+chmod 600 "$SCRIPT_DIR/.env.local" 2>/dev/null || true
+success "Permissions set — any user can run 'npm run dev' from this directory"
+
+# ── 8. Done ───────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Setup complete!                       ${NC}"

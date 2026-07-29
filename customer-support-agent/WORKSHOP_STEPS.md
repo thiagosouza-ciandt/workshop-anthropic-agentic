@@ -1,6 +1,6 @@
 # CorpBank — Multi-Agent Workshop
 
-Build a production-style customer support system from a single API call to a full multi-agent architecture with real data, document search, and live human handoff.
+Build a production-style customer support system — from a single API call to a full multi-agent architecture with real data, document search, and live human handoff.
 
 ![Customer Support Case](tutorial/customer-support-workshop-case.png)
 
@@ -9,10 +9,10 @@ Build a production-style customer support system from a single API call to a ful
 ## Before you start
 
 ```bash
-# 1. Clone and enter the project (Clone can be skiped if the environment is ready to use)
-cd ~/Downloads/workshop-anthropic-agentic/customer-support-agent$ 
+# 1. Enter the project
+cd ~/Downloads/workshop-anthropic-agentic/customer-support-agent
 
-# 2. Run setup — installs deps, starts Docker infra, creates .env.local (setup can be skiped if the environment is ready to use)
+# 2. Run setup — installs deps, starts Docker infra, creates .env.local
 ./setup.sh
 
 # 3. Fill in your Bedrock token in .env.local
@@ -22,7 +22,7 @@ cd ~/Downloads/workshop-anthropic-agentic/customer-support-agent$
 npm run dev
 ```
 
-App runs at `http://localhost:3000`. No restarts needed during the workshop — Next.js hot-reloads on every save.
+App runs at `http://localhost:3000`. No restarts needed — Next.js hot-reloads on every save.
 
 ---
 
@@ -51,28 +51,13 @@ Customer message
 
 ---
 
-## Files you will create
-
-```
-app/
-  lib/agents/
-    customer-data.ts 
-    billing.ts        
-    payments.ts        
-    coordinator.ts      
-    mcp-docs.ts         
-```
-
----
-
 ---
 
 # Step 1 — Basic Agent
 
-**~15 min** · Single API call · Structured JSON output
+**~15 min** · Single API call · Structured JSON output · Ground rules
 
 ---
-
 
 Open `http://localhost:3000` and send:
 
@@ -86,13 +71,13 @@ The agent responds but says it cannot access account data — correct, it has no
 
 ### How it works
 
-Every message from the frontend calls `POST /api/chat`. The handler makes **one call** to Claude and returns structured JSON:
+Every message from the frontend calls `POST /api/chat`. The handler calls the coordinator, which makes **one call** to Claude and returns structured JSON:
 
 ```typescript
 const response = await anthropic.messages.create({
   model,
   system: SYSTEM_PROMPT,  // agent identity and rules
-  messages,               // full conversation history (more on this in Step 2)
+  messages,               // full conversation history
 });
 // → Claude returns JSON text
 // → Zod validates the shape
@@ -105,47 +90,28 @@ The frontend renders `response` as the chat bubble, turns `suggested_questions` 
 
 ```typescript
 const responseSchema = z.object({
-  thinking: z.string(),           // internal reasoning — shown in the debug panel, not to the customer
+  thinking: z.string(),           // internal reasoning — shown in the debug panel
   response: z.string(),           // what the customer reads
   user_mood: z.enum([...]),       // drives the sentiment indicator
-  suggested_questions: z.array(z.string()),  // quick-reply buttons
+  suggested_questions: z.array(z.string()),
   redirect_to_agent: z.object({ should_redirect: z.boolean() }),
   debug: z.object({ context_used: z.boolean() }),
 });
 ```
 
-### Try it
+### Explore the system prompt
 
-1 - Change the bank name in `SYSTEM_PROMPT` from `CorpBank` to anything. Save — the agent introduces itself with the new name immediately.
+Open `app/lib/agents/coordinator.ts` and find `SYSTEM_PROMPT`.
 
-2 -  Check the `SYSTEM_PROMPT` ground rules
+**Try it:**
+
+1. Change the bank name from `CorpBank` to anything. Save — the agent introduces itself with the new name immediately.
+2. Add a rule like `Always respond in Portuguese.` — see it take effect instantly.
+3. Add a guardrail: `Never discuss competitors or other banks.` — test it in the chat.
+
+The system prompt is the agent's contract. Ground rules, persona, and constraints all live here.
+
 ---
-
-SYSTEM_PROMPT = `You are a virtual customer support assistant for CorpBank.
-Be friendly, clear, and concise. Always reply in English.
-You can help with:
-- Account balance and transaction history
-- Bills and invoices
-- Loan requests
-- Credit limit questions
-- General questions about bank products
-
-IMPORTANT RULES:
-- You do NOT have access to customer data yet — you cannot look up balances, bills, or loans.
-- Never ask the customer to log in, use an app, or go through any authentication process.
-- When the customer asks for account data, acknowledge the request and let them know
-  this capability will be available soon.
-- If the customer explicitly asks to speak with a human, signal a redirection.
-
-IMPORTANT: Always respond as a valid JSON object:
-{
-  "thinking": "your internal reasoning about how to respond",
-  "response": "your response to the customer",
-  "user_mood": "positive|neutral|negative|curious|frustrated|confused",
-  "suggested_questions": ["Suggested question 1?", "Suggested question 2?"],
-  "redirect_to_agent": { "should_redirect": false },
-  "debug": { "context_used": false }
-}
 
 ---
 
@@ -181,7 +147,7 @@ body: JSON.stringify({
 }),
 ```
 
-The frontend sends the **entire conversation array** on every request — not just the latest message. Claude reads from the beginning on every call. The `messages[]` array is the only memory.
+The frontend sends the **entire conversation array** on every request. Claude reads from the beginning on every call. The `messages[]` array is the only memory.
 
 ### What this means in practice
 
@@ -196,23 +162,23 @@ The frontend sends the **entire conversation array** on every request — not ju
 
 ---
 
-# Step 3 — Specialist Agents
+# Step 3 — Customer Data Agent
 
-**~25 min** · Multiple Claude instances · Separation of concerns
-
----
-
-A single agent that knows everything is hard to tune. Improving loan logic can accidentally change how account balances are reported. Specialist agents solve this: each one has its own system prompt, its own tools, and can be changed independently.
+**~20 min** · First specialist · Identity + account data · Test identification
 
 ---
 
-### 3.1 — Create `app/lib/agents/customer-data.ts`
+A single agent that knows everything is hard to tune. Improving loan logic can accidentally change how balances are reported. Specialist agents solve this: each one has its own system prompt, its own tools, and can be changed independently.
+
+In this step you wire up the first specialist: the Customer Data agent, which handles identity verification and account queries.
+
+---
+
+### 3.1 — Fill in `app/lib/agents/customer-data.ts`
+
+The file already has the imports. Add the following code:
 
 ```typescript
-// Customer Data specialist — identity, accounts, transactions.
-
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
-
 // database connection
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
@@ -270,7 +236,6 @@ const tools: any[] = [
   },
 ];
 
-// regex ID validation
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
 
 function validateId(id: string, field: string): void {
@@ -281,7 +246,6 @@ async function executeTool(name: string, input: any): Promise<string> {
   try {
     switch (name) {
       case "identify_customer":
-        // POST keeps name and phone out of the URL and access logs
         return JSON.stringify(await dbPost("/customers/identify", {
           name: input.name,
           phone: input.phone,
@@ -356,13 +320,94 @@ export async function runCustomerDataAgent(
 
 ---
 
-### 3.2 — Create `app/lib/agents/billing.ts`
+### 3.2 — Add `delegate_customer_data` to the Coordinator
+
+Open `app/lib/agents/coordinator.ts`. The coordinator stub calls Claude directly. Now you'll make it delegate identity and account queries to the specialist.
+
+**Add the import** at the top:
 
 ```typescript
-// Billing specialist — bills and invoices.
+import { runCustomerDataAgent } from "./customer-data";
+```
 
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
+**Add the tool** inside the `tools` array:
 
+```typescript
+{
+  name: "delegate_customer_data",
+  description:
+    "Delegate to the customer data specialist. Use for: identity verification, account balances, transaction history.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      task: { type: "string", description: "Full task including customer name, phone, and question" },
+    },
+    required: ["task"],
+  },
+},
+```
+
+**Add the case** inside the `executor` switch:
+
+```typescript
+case "delegate_customer_data":
+  return runCustomerDataAgent(anthropic, SPECIALIST_MODEL, input.task);
+```
+
+Where `SPECIALIST_MODEL` is defined before the executor:
+
+```typescript
+const SPECIALIST_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
+```
+
+**Update the system prompt** — add this to `AGENTS AVAILABLE`:
+
+```
+- delegate_customer_data: identity, account balances, transaction history
+```
+
+---
+
+### 3.3 — Test
+
+Send:
+
+```
+What's my balance? Alice Johnson, +1-555-0101
+```
+
+Terminal output:
+
+```
+[Coordinator] started
+  [Coordinator] -> delegate_customer_data
+[CustomerDataAgent] task length: 89
+  [CustomerData] tool: identify_customer
+  [CustomerData] tool: get_accounts
+[Coordinator] done
+```
+
+The coordinator delegated, the specialist called the database, and Claude synthesized a real answer.
+
+### Why `validateId()` before every URL interpolation?
+
+The `customer_id` comes from the model. Claude is not malicious, but IDs from AI output should be treated as untrusted input — same as user input. `validateId()` prevents path traversal (`../../etc/passwd`) from ever reaching the URL.
+
+---
+
+---
+
+# Step 4 — Billing Agent
+
+**~15 min** · Second specialist · Bills and invoices
+
+---
+
+### 4.1 — Fill in `app/lib/agents/billing.ts`
+
+The file already has the imports. Add:
+
+```typescript
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
 async function db(path: string) {
@@ -459,13 +504,88 @@ export async function runBillingAgent(
 
 ---
 
-### 3.3 — Create `app/lib/agents/payments.ts`
+### 4.2 — Add `delegate_billing` to the Coordinator
+
+**Add the import:**
 
 ```typescript
-// Payments specialist — credit limits and loan requests.
+import { runBillingAgent } from "./billing";
+```
 
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
+**Add the tool:**
 
+```typescript
+{
+  name: "delegate_billing",
+  description:
+    "Delegate to the billing specialist. Use for: open bills, overdue invoices, payment due dates.",
+  input_schema: {
+    type: "object" as const,
+    properties: { task: { type: "string" } },
+    required: ["task"],
+  },
+},
+```
+
+**Add the case:**
+
+```typescript
+case "delegate_billing":
+  return runBillingAgent(anthropic, SPECIALIST_MODEL, input.task);
+```
+
+**Add to the system prompt:**
+
+```
+- delegate_billing: bills, invoices, payment due dates
+```
+
+**Add the delegation rule** — billing needs the `customer_id` already resolved:
+
+```
+3. For billing tasks: first call delegate_customer_data to resolve the customer_id,
+   then pass that customer_id when calling delegate_billing.
+```
+
+---
+
+### 4.3 — Test
+
+Send:
+
+```
+What's my balance and any open bills? Alice Johnson, +1-555-0101
+```
+
+Terminal:
+
+```
+[Coordinator] started
+  [Coordinator] -> delegate_customer_data
+  [CustomerData] tool: identify_customer
+  [CustomerData] tool: get_accounts
+  [Coordinator] -> delegate_billing
+  [Billing] tool: get_bills
+[Coordinator] done
+```
+
+Two agents called, one synthesized response.
+
+---
+
+---
+
+# Step 5 — Payments Agent
+
+**~15 min** · Third specialist · Credit limits and loan requests
+
+---
+
+### 5.1 — Fill in `app/lib/agents/payments.ts`
+
+The file already has the imports. Add:
+
+```typescript
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
 async function db(path: string) {
@@ -604,427 +724,77 @@ export async function runPaymentsAgent(
 
 ---
 
-### What all three agents have in common
+### 5.2 — Add `delegate_payments` to the Coordinator
 
-```
-system prompt    → identity and domain-specific rules
-tools            → only what this agent needs
-executeTool()    → switch/case: tool name → fetch call
-runXxxAgent()    → agentic loop: call Claude → execute tools → repeat until end_turn
-```
-
-The `while (true)` loop is what makes an agent autonomous. Without it, Claude requests a tool but your code never sends the result back, so Claude never composes the final response. The loop runs until `stop_reason === "end_turn"` — meaning Claude has all the data it needs and is ready to answer.
-
----
-
----
-
-# Step 4 — Orchestration
-
-**~25 min** · Coordinator pattern · Agent-as-tool
-
----
-
-The Coordinator receives the customer's message, decides which specialist to call, and synthesizes all responses into one reply. The key insight: **the specialists are the Coordinator's tools** — calling another Claude agent uses the exact same tool-calling mechanism as calling a database.
-
-```
-Coordinator calls delegate_billing
-  → executor() runs runBillingAgent()
-  → BillingAgent makes its own tool calls to the database
-  → returns text back to the Coordinator
-  → Coordinator synthesizes and responds to the customer
-```
-
----
-
-### 4.1 — Edit `app/lib/agents/coordinator.ts`
+**Add the import:**
 
 ```typescript
-// Coordinator — routes requests to specialist agents and synthesizes the response.
-
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
-import { z } from "zod";
-import { runCustomerDataAgent } from "./customer-data";
-import { runBillingAgent } from "./billing";
 import { runPaymentsAgent } from "./payments";
-import { searchDocs } from "./mcp-docs";
+```
 
-export const responseSchema = z.object({
-  thinking: z.string(),
-  response: z.string(),
-  user_mood: z.enum(["positive", "neutral", "negative", "curious", "frustrated", "confused"]),
-  suggested_questions: z.array(z.string()),
-  redirect_to_agent: z.object({
-    should_redirect: z.boolean(),
-    reason: z.string().optional(),
-  }),
-  debug: z.object({ context_used: z.boolean() }),
-  orchestration: z.object({
-    agents_called: z.array(z.string()),
-    needs_human_approval: z.boolean().optional(),
-    loan_id: z.string().optional(),
-  }).optional(),
-});
+**Add the tool:**
 
-export type CoordinatorResponse = z.infer<typeof responseSchema>;
+```typescript
+{
+  name: "delegate_payments",
+  description:
+    "Delegate to the payments specialist. Use for: loan applications, credit limit questions.",
+  input_schema: {
+    type: "object" as const,
+    properties: { task: { type: "string" } },
+    required: ["task"],
+  },
+},
+```
 
-export type EscalationInput = {
-  customer_id: string;
-  customer_name: string;
-  customer_phone?: string;
-  reason: string;
-  loan_id?: string;
-};
+**Add the case:**
 
-export type CoordinatorResult = {
-  response: CoordinatorResponse;
-  escalation: EscalationInput | null;
-};
+```typescript
+case "delegate_payments":
+  return runPaymentsAgent(anthropic, SPECIALIST_MODEL, input.task);
+```
 
-function parseJSON(text: string) {
-  const stripped = text
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/, "")
-    .trim();
-  const match = stripped.match(/\{[\s\S]*\}/);
-  if (match) return JSON.parse(match[0]);
-  return {
-    thinking: "Claude responded in plain text — wrapped as fallback.",
-    response: text.trim(),
-    user_mood: "neutral",
-    suggested_questions: [],
-    redirect_to_agent: { should_redirect: false },
-    debug: { context_used: false },
-  };
-}
+**Add to the system prompt:**
 
-const SYSTEM_PROMPT = `You are the Coordinator Agent for CorpBank.
-Understand the customer's request and delegate to the right specialist agent.
-
-IDENTITY RULE — most important:
-When the customer provides their full name and phone number, that is ALL that is needed
-for identification. NEVER ask the customer for a Customer ID, account number, or any
-other credential. The specialists resolve the Customer ID internally from name + phone.
-
-AGENTS AVAILABLE:
-- delegate_customer_data: identity, account balances, transaction history
-- delegate_billing: bills, invoices, payment due dates
+```
 - delegate_payments: loan applications, credit limits
-- search_docs: CorpBank internal policy documents (rates, fees, eligibility, products)
-- escalate_to_human: transfer the conversation to a human agent
+```
 
-DELEGATION RULES:
-1. As soon as the customer provides name + phone, delegate immediately — do not ask for more.
-2. Always pass the customer's name, phone, and full question to the delegate.
-3. For billing and payments tasks: first call delegate_customer_data to resolve the
-   customer_id, then include that customer_id when calling delegate_billing or
-   delegate_payments so they don't need to re-identify.
-4. You may call more than one agent if the request spans multiple domains.
-5. Synthesize all agent responses into a single coherent reply for the customer.
-6. If the payments agent signals needs_human_approval=true, ask the customer whether
-   they want to be transferred to a human agent. If they confirm → call escalate_to_human.
+**Add the escalation rules:**
 
+```
 ESCALATION RULES:
 - Only escalate when: (a) loan > $500 confirmed by customer, or (b) customer explicitly
   demands to speak with a human immediately.
-- Do NOT escalate for credit limit questions, complaints, or routine inquiries.
-
-POST-LOAN RESPONSE RULES:
-After any loan outcome (approved, pending, or denied), always include in suggested_questions:
-- One option to continue ("Is there anything else I can help you with?")
-- One option to close ("No, that's all — thank you!")
-- One contextually relevant follow-up (e.g. "What are my current account balances?")
-Never leave suggested_questions empty after a loan decision.
-
-IMPORTANT: Always respond as valid JSON:
-{
-  "thinking": "which agents you called and why",
-  "response": "your response to the customer",
-  "user_mood": "positive|neutral|negative|curious|frustrated|confused",
-  "suggested_questions": ["Question 1?", "Question 2?"],
-  "redirect_to_agent": { "should_redirect": false },
-  "debug": { "context_used": true },
-  "orchestration": { "agents_called": ["customer_data", "billing"] }
-}`;
-
-export async function runCoordinator(
-  anthropic: AnthropicBedrock,
-  model: string,
-  messages: any[],
-): Promise<CoordinatorResult> {
-  console.log("[Coordinator] started");
-
-  const tools: any[] = [
-    {
-      name: "delegate_customer_data",
-      description:
-        "Delegate to the customer data specialist. Use for: identity verification, account balances, transaction history.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          task: { type: "string", description: "Full task including customer name, phone, and question" },
-        },
-        required: ["task"],
-      },
-    },
-    {
-      name: "delegate_billing",
-      description:
-        "Delegate to the billing specialist. Use for: open bills, overdue invoices, payment due dates.",
-      input_schema: {
-        type: "object" as const,
-        properties: { task: { type: "string" } },
-        required: ["task"],
-      },
-    },
-    {
-      name: "delegate_payments",
-      description:
-        "Delegate to the payments specialist. Use for: loan applications, credit limit questions.",
-      input_schema: {
-        type: "object" as const,
-        properties: { task: { type: "string" } },
-        required: ["task"],
-      },
-    },
-    {
-      name: "search_docs",
-      description:
-        "Search CorpBank's internal policy documents. Use when the customer asks about interest rates, fees, loan eligibility, account types, or anything requiring official documentation — not live account data.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          query: { type: "string", description: "Keywords to search, e.g. 'loan interest rate'" },
-        },
-        required: ["query"],
-      },
-    },
-    {
-      name: "escalate_to_human",
-      description:
-        "Transfer the conversation to a human agent. Use ONLY when: (1) a loan > $500 has been registered and the customer confirms they want to transfer, or (2) the customer explicitly demands to speak with a human immediately.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          customer_id:    { type: "string" },
-          customer_name:  { type: "string" },
-          customer_phone: { type: "string", description: "Customer phone number — pass if available" },
-          reason:         { type: "string", description: "Why the handoff is needed" },
-          loan_id:        { type: "string", description: "Loan ID if this is a loan escalation" },
-        },
-        required: ["customer_id", "customer_name", "reason"],
-      },
-    },
-  ];
-
-  let escalation: EscalationInput | null = null;
-
-  const executor = async (name: string, input: any): Promise<string> => {
-    switch (name) {
-      case "delegate_customer_data":
-        return runCustomerDataAgent(anthropic, model, input.task);
-      case "delegate_billing":
-        return runBillingAgent(anthropic, model, input.task);
-      case "delegate_payments":
-        return runPaymentsAgent(anthropic, model, input.task);
-      case "search_docs":
-        return searchDocs(input.query);
-      case "escalate_to_human":
-        // Capture the signal — route.ts handles the actual DB write and SSE publish
-        escalation = input as EscalationInput;
-        return JSON.stringify({ escalated: true });
-      default:
-        return JSON.stringify({ error: `Unknown agent: ${name}` });
-    }
-  };
-
-  const currentMessages = [...messages];
-
-  while (true) {
-    const res = await anthropic.messages.create({
-      model,
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      tools,
-      messages: currentMessages,
-    });
-
-    if (res.stop_reason === "end_turn") {
-      const text = res.content
-        .filter((b: any) => b.type === "text")
-        .map((b: any) => b.text)
-        .join(" ");
-      console.log("[Coordinator] done");
-      return { response: responseSchema.parse(parseJSON(text)), escalation };
-    }
-
-    currentMessages.push({ role: "assistant", content: res.content });
-
-    const results: any[] = [];
-    for (const block of res.content) {
-      if (block.type !== "tool_use") continue;
-      console.log(`  [Coordinator] -> ${block.name}`);
-      results.push({
-        type: "tool_result",
-        tool_use_id: block.id,
-        content: await executor(block.name, block.input),
-      });
-    }
-    currentMessages.push({ role: "user", content: results });
-  }
-}
+- If the payments agent signals needs_human_approval=true, ask the customer whether
+  they want to be transferred to a human agent. If they confirm → call escalate_to_human.
 ```
 
 ---
 
-### 4.2 — Replace `app/api/chat/route.ts`
+### 5.3 — Test
 
-```typescript
-// Chat API route — thin wrapper: receives the request, runs the coordinator, handles handoffs.
-
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
-import crypto from "crypto";
-import { publish } from "@/app/lib/sse-store";
-import { runCoordinator } from "@/app/lib/agents/coordinator";
-
-const anthropic = new AnthropicBedrock({
-  awsRegion: process.env.AWS_REGION ?? "us-east-1",
-});
-
-const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
-
-async function dbPost(path: string, body: object) {
-  const res = await fetch(`${CORPDB_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`CorpDB ${res.status}: ${path}`);
-  return res.json();
-}
-
-export async function POST(req: Request) {
-  const { messages, model, conversationId = crypto.randomUUID() } = await req.json();
-
-  try {
-    const { response: result, escalation } = await runCoordinator(
-      anthropic,
-      model ?? "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-      messages.map((msg: any) => ({ role: msg.role, content: msg.content })),
-    );
-
-    if (escalation) {
-      const existing = await fetch(`${CORPDB_URL}/handoffs?status=waiting`)
-        .then((r) => r.ok ? r.json() : []).catch(() => []);
-      const alreadyOpen = existing.some((h: any) => h.conversation_id === conversationId);
-
-      if (alreadyOpen) {
-        console.log(`[Handoff] already open for ${conversationId} — skipping duplicate`);
-      } else {
-        // Prefer the customer_id the coordinator resolved; fall back to name+phone lookup.
-        let customer = escalation.customer_id
-          ? await fetch(`${CORPDB_URL}/customers/${escalation.customer_id}`)
-              .then((r) => r.ok ? r.json() : null).catch(() => null)
-          : null;
-
-        if (!customer && escalation.customer_name && escalation.customer_phone) {
-          customer = await fetch(
-            `${CORPDB_URL}/customers/identify?name=${encodeURIComponent(escalation.customer_name)}&phone=${encodeURIComponent(escalation.customer_phone)}`
-          ).then((r) => r.ok ? r.json() : null).catch(() => null);
-        }
-
-        if (!customer) {
-          console.error("[Handoff] cannot create — customer not resolved. customer_id:",
-            escalation.customer_id ?? "(missing)", "loan_id:", escalation.loan_id ?? "(missing)");
-          return Response.json({
-            id: crypto.randomUUID(),
-            conversation_id: conversationId,
-            handoff_initiated: false,
-            ...result,
-          });
-        }
-
-        const handoff = await dbPost("/handoffs", {
-          conversation_id: conversationId,
-          customer_id: customer.id,
-          loan_id: escalation.loan_id ?? null,
-          context: {
-            messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
-            agent_reasoning: escalation.reason,
-            customer_summary: `${customer.name} | Credit limit: $${customer.credit_limit_usd}`,
-          },
-        });
-
-        publish("*", {
-          type: "handoff_created",
-          payload: {
-            handoff_id: handoff.id,
-            conversation_id: conversationId,
-            customer_id: customer.id,
-            customer_name: customer.name ?? escalation.customer_name ?? "Unknown",
-            loan_id: escalation.loan_id ?? "",
-            amount: 0,
-            context: handoff.context ?? {},
-          },
-        });
-
-        console.log(`[Handoff] created: ${handoff.id}`);
-      }
-    }
-
-    return Response.json({
-      id: crypto.randomUUID(),
-      conversation_id: conversationId,
-      handoff_initiated: !!escalation,
-      ...result,
-    });
-  } catch (error) {
-    console.error("Agent error:", error);
-    return Response.json(
-      {
-        response: "Sorry, an error occurred. Please try again.",
-        thinking: "Internal error.",
-        user_mood: "neutral",
-        suggested_questions: [],
-        redirect_to_agent: { should_redirect: false },
-        debug: { context_used: false },
-      },
-      { status: 500 },
-    );
-  }
-}
-```
-
-> **Why does `route.ts` handle the handoff instead of the Coordinator?**
-> The Coordinator is an AI agent — it decides and signals intent (`escalation = input`). Creating a database record, publishing an SSE event, and deduplicating are infrastructure concerns. Keeping them in `route.ts` means you can swap SSE for WebSockets, or change the database, without touching any agent logic.
-
----
-
-### 4.3 — Test
-
-Send: `"What's my balance and any open bills? Alice Johnson, +1-555-0101"`
-
-Terminal output:
+Send:
 
 ```
-[Coordinator] started
-  [Coordinator] -> delegate_customer_data
-  [CustomerData] tool: identify_customer
-  [CustomerData] tool: get_accounts
-  [Coordinator] -> delegate_billing
-  [Billing] tool: get_bills
-[Coordinator] done
+I want a $200 loan. Bob Smith, +1-555-0102
 ```
 
-Two agents called, one synthesized response.
+Auto-approved (≤ $500). Then try:
+
+```
+I need an $800 loan. Carol Martinez, +1-555-0103
+```
+
+Pending — above $500, requires human approval.
 
 ---
 
 ---
 
-# Step 5 — MCP
+# Step 6 — MCP (Document Search)
 
-**~20 min** · Standard integration protocol · Swap data sources without changing agent code
+**~20 min** · Standard integration protocol · Policy documents
 
 ---
 
@@ -1041,7 +811,7 @@ With MCP:     Agent → MCP client → MCP server → any source
 - `corpdb-api` on port `3001` — SQLite REST API
 - `corpbank-mcp-docs` on port `8082` — MCP filesystem server
 
-The `corpbank-mcp-docs` container uses `supercorp/supergateway`, which wraps `@modelcontextprotocol/server-filesystem` (stdio) and exposes it as HTTP SSE at `http://localhost:8082/sse`. That is why the client uses `SSEClientTransport` — your app speaks HTTP, Docker handles stdio internally.
+The MCP container wraps `@modelcontextprotocol/server-filesystem` and exposes it as HTTP SSE at `http://localhost:8082/sse`.
 
 The server exposes the four files in `docs/`:
 
@@ -1052,16 +822,45 @@ The server exposes the four files in `docs/`:
 | `faq.md` | Common questions and answers |
 | `products.md` | Account types and support channels |
 
-### `mcp-docs.ts` already exists — open it
+### `mcp-docs.ts` is already created — add it to the Coordinator
 
-`app/lib/agents/mcp-docs.ts` is already created and already imported by the Coordinator. It:
+**Add the import:**
 
-1. Connects once via `SSEClientTransport` and caches the client in `globalThis`
-2. Calls `list_directory` on the MCP server to get filenames
-3. Calls `read_text_file` for each file and returns all content
-4. Claude extracts the relevant answer from the full content (stuff RAG — no vector search needed at this scale)
+```typescript
+import { searchDocs } from "./mcp-docs";
+```
 
-The `onclose` / `onerror` handlers reset the cache flag so the next request reconnects automatically if the transport drops.
+**Add the tool:**
+
+```typescript
+{
+  name: "search_docs",
+  description:
+    "Search CorpBank's internal policy documents. Use when the customer asks about interest rates, fees, loan eligibility, account types, or anything requiring official documentation — not live account data.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      query: { type: "string", description: "Keywords to search, e.g. 'loan interest rate'" },
+    },
+    required: ["query"],
+  },
+},
+```
+
+**Add the case:**
+
+```typescript
+case "search_docs":
+  return searchDocs(input.query);
+```
+
+**Add to the system prompt:**
+
+```
+- search_docs: CorpBank internal policy documents (rates, fees, eligibility, products)
+```
+
+---
 
 ### Test
 
@@ -1081,13 +880,13 @@ Terminal:
 [Coordinator] done
 ```
 
-To swap the data source for a remote one (Notion, Google Drive, a SQL database), change only `MCP_DOCS_URL` in `.env.local` and the Docker image in `infra/docker-compose.yml`. The agent code does not change.
+To swap the data source, change only `MCP_DOCS_URL` in `.env.local` and the Docker image in `infra/docker-compose.yml`. The agent code does not change.
 
 ---
 
 ---
 
-# Step 6 — Human-in-the-Loop
+# Step 7 — Human-in-the-Loop
 
 **~20 min** · Real-time handoff · SSE
 
@@ -1104,11 +903,54 @@ The handoff infrastructure is already in the repo. SSE (Server-Sent Events) is a
 | `app/api/handoff/route.ts` | Creates handoffs, receives backoffice messages |
 | `app/backoffice/page.tsx` | Human agent UI |
 
+### Add `escalate_to_human` to the Coordinator
+
+**Add the tool:**
+
+```typescript
+{
+  name: "escalate_to_human",
+  description:
+    "Transfer the conversation to a human agent. Use ONLY when: (1) a loan > $500 has been registered and the customer confirms they want to transfer, or (2) the customer explicitly demands to speak with a human immediately.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      customer_id:    { type: "string" },
+      customer_name:  { type: "string" },
+      customer_phone: { type: "string", description: "Customer phone number — pass if available" },
+      reason:         { type: "string", description: "Why the handoff is needed" },
+      loan_id:        { type: "string", description: "Loan ID if this is a loan escalation" },
+    },
+    required: ["customer_id", "customer_name", "reason"],
+  },
+},
+```
+
+**Add the case** — the coordinator only signals intent; `route.ts` handles the DB write and SSE publish:
+
+```typescript
+case "escalate_to_human":
+  escalation = input as EscalationInput;
+  return JSON.stringify({ escalated: true });
+```
+
+Declare the variable before the executor:
+
+```typescript
+let escalation: EscalationInput | null = null;
+```
+
+Return it alongside the response:
+
+```typescript
+return { response: responseSchema.parse(parseJSON(text)), escalation };
+```
+
 ### The full flow
 
 ```
 Customer confirms transfer
-  → Coordinator captures: escalation = { customer_id, reason, loan_id }
+  → Coordinator sets: escalation = { customer_id, reason, loan_id }
   → route.ts creates handoff record in DB  (POST /handoffs)
   → route.ts publishes:  publish("*", { type: "handoff_created", ... })
   → Backoffice has EventSource open on /api/stream?channel=*
@@ -1119,12 +961,6 @@ Operator sends a message
   → publish(conversationId, { type: "human_message", ... })
   → Customer chat has EventSource on /api/stream?channel=<conversationId>
   → Customer sees the message in real time
-
-Operator approves or rejects the loan
-  → PATCH /api/handoff
-  → publish(conversationId, { type: "loan_resolved", decision: "approved" })
-  → Chat renders the decision + three suggested next steps
-  → handoffMode resets to false — chat input reactivates
 ```
 
 ### Test
@@ -1146,7 +982,7 @@ The agent registers the loan (pending — above $500), then asks if Carol wants 
 Yes, please transfer me to a human agent.
 ```
 
-In the backoffice: Carol's card appears instantly with the full conversation, agent reasoning, credit summary, and loan amount.
+In the backoffice: Carol's card appears instantly with the full conversation, agent reasoning, and credit summary.
 
 From the backoffice:
 - Type a message → Carol sees it in real time
@@ -1181,8 +1017,8 @@ route.ts  (HTTP layer — infra only)
 |---|---|
 | Specialist agents per domain | Change billing without touching payments |
 | Specialists as tools | No special multi-agent API — same tool-calling pattern throughout |
-| Handoff logic in `route.ts`, not in the Coordinator | Agent decides; infrastructure executes. Swap SSE for WebSockets without touching agent code |
-| `validateId()` before every URL interpolation | IDs come from the model — treat them as untrusted input |
+| Handoff logic in `route.ts`, not in the Coordinator | Agent decides; infrastructure executes |
+| `validateId()` before every URL interpolation | IDs come from the model — treat as untrusted input |
 | Tool name sent as POST body, not query string | Keeps PII out of access logs |
 | Full `messages[]` array on every request | Claude is stateless; the array is the only memory |
 | Tool `description` is the interface | Claude never sees your implementation — the description controls behavior |
