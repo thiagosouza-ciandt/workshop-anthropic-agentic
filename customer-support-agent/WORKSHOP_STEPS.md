@@ -118,7 +118,7 @@ const responseSchema = z.object({
 
 1 - Change the bank name in `SYSTEM_PROMPT` from `CorpBank` to anything. Save — the agent introduces itself with the new name immediately.
 
-2 -  Add some ground rules
+2 -  Check the ground rules
 ---
 
 You can help with:
