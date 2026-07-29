@@ -118,9 +118,11 @@ const responseSchema = z.object({
 
 1 - Change the bank name in `SYSTEM_PROMPT` from `CorpBank` to anything. Save — the agent introduces itself with the new name immediately.
 
-2 -  Check the ground rules
+2 -  Check the `SYSTEM_PROMPT` ground rules
 ---
 
+SYSTEM_PROMPT = `You are a virtual customer support assistant for CorpBank.
+Be friendly, clear, and concise. Always reply in English.
 You can help with:
 - Account balance and transaction history
 - Bills and invoices
@@ -211,6 +213,7 @@ A single agent that knows everything is hard to tune. Improving loan logic can a
 
 import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 
+// database connection
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
 async function db(path: string) {
@@ -229,6 +232,7 @@ async function dbPost(path: string, body: object) {
   return res.json();
 }
 
+// tools definition
 const tools: any[] = [
   {
     name: "identify_customer",
@@ -266,6 +270,7 @@ const tools: any[] = [
   },
 ];
 
+// regex ID validation
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
 
 function validateId(id: string, field: string): void {
@@ -632,7 +637,7 @@ Coordinator calls delegate_billing
 
 ---
 
-### 4.1 — Create `app/lib/agents/coordinator.ts`
+### 4.1 — Edit `app/lib/agents/coordinator.ts`
 
 ```typescript
 // Coordinator — routes requests to specialist agents and synthesizes the response.

@@ -195,7 +195,13 @@ for i in $(seq 1 30); do
 done
 
 # ── 6. npm install ────────────────────────────────────────────────────────────
-info "Installing Node.js dependencies..."
+info "Installing Node.js dependencies (sqlite-api)..."
+cd "$SCRIPT_DIR/infra/sqlite-api"
+npm install 2>&1 | tail -3
+success "sqlite-api npm install done"
+cd "$SCRIPT_DIR"
+
+info "Installing Node.js dependencies (app)..."
 # Remove stale build artifacts — .next built on another machine causes 404s on static chunks
 rm -rf "$SCRIPT_DIR/.next"
 npm install 2>&1 | tail -3
