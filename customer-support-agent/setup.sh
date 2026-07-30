@@ -208,14 +208,30 @@ npm install 2>&1 | tail -3
 success "npm install done"
 
 # ── 7. Multi-user permissions ─────────────────────────────────────────────────
-# Allow any user to write only the build/cache dirs — credentials stay protected
-info "Setting permissions for multi-user access..."
-mkdir -p "$SCRIPT_DIR/.next" "$SCRIPT_DIR/node_modules/.cache"
-chmod -R a+rwx "$SCRIPT_DIR/.next"
-chmod -R a+rwx "$SCRIPT_DIR/node_modules/.cache"
-# Harden credential file so only the owner can read it
-chmod 600 "$SCRIPT_DIR/.env.local" 2>/dev/null || true
-success "Permissions set — any user can run 'npm run dev' from this directory"
+# Create 'workshop' group and configure the OS to add every new user to it
+# automatically. When this machine is imaged, any user that logs in will already
+# have write access to the project — no extra steps needed.
+info "Setting up shared group 'workshop' for multi-user access..."
+if ! getent group workshop &>/dev/null; then
+  sudo groupadd workshop
+fi
+sudo usermod -aG workshop "$USER"
+sudo chgrp -R workshop "$SCRIPT_DIR"
+sudo chmod -R g+rwX,o-w "$SCRIPT_DIR"   # group rw; no world-write
+sudo chmod 600 "$SCRIPT_DIR/.env.local" 2>/dev/null || true
+
+# Add new users to the workshop group automatically on login/creation
+if grep -q "^EXTRA_GROUPS=" /etc/adduser.conf 2>/dev/null; then
+  sudo sed -i 's/^EXTRA_GROUPS=.*/EXTRA_GROUPS="workshop"/' /etc/adduser.conf
+else
+  echo 'EXTRA_GROUPS="workshop"' | sudo tee -a /etc/adduser.conf > /dev/null
+fi
+if grep -q "^ADD_EXTRA_GROUPS=" /etc/adduser.conf 2>/dev/null; then
+  sudo sed -i 's/^ADD_EXTRA_GROUPS=.*/ADD_EXTRA_GROUPS=1/' /etc/adduser.conf
+else
+  echo 'ADD_EXTRA_GROUPS=1' | sudo tee -a /etc/adduser.conf > /dev/null
+fi
+success "Any user created on this machine will automatically have access to the project"
 
 # ── 8. Done ───────────────────────────────────────────────────────────────────
 echo ""
