@@ -207,18 +207,7 @@ rm -rf "$SCRIPT_DIR/.next"
 npm install 2>&1 | tail -3
 success "npm install done"
 
-# ── 7. Multi-user permissions ─────────────────────────────────────────────────
-# Create 'workshop' group and configure the OS to add every new user to it
-# automatically. When this machine is imaged, any user that logs in will already
-# have write access to the project — no extra steps needed.
-# Workshop environment: world-readable/writable so any user can run immediately
-# without group membership or re-login. .env.local is hardened separately.
-# Note: this is intentional for controlled workshop VMs — not suitable for production.
-sudo chmod -R a+rwX "$SCRIPT_DIR"
-sudo chmod 600 "$SCRIPT_DIR/.env.local" 2>/dev/null || true
-success "Any user can open and run this project directly — no extra steps needed"
-
-# ── 8. Done ───────────────────────────────────────────────────────────────────
+# ── 7. Done ───────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Setup complete!                       ${NC}"
