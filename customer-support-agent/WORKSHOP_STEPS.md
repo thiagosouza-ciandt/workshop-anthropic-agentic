@@ -2,23 +2,27 @@
 
 Build a production-style customer support system — from a single API call to a full multi-agent architecture with real data, document search, and live human handoff.
 
-![Customer Support Case](tutorial/customer-support-workshop-case.png)
+![Customer Support Case](tutorial/images/customer-support-workshop-case.png)
 
 ---
 
 ## Before you start
 
 ```bash
-# 1. Enter the project
-cd ~/Downloads/workshop-anthropic-agentic/customer-support-agent
+# 1. Clone the project into your Downloads directory
+cd Downloads
+git clone https://github.com/thiagosouza-ciandt/workshop-anthropic-agentic
 
 # 2. Run setup — installs deps, starts Docker infra, creates .env.local
+cd workshop-anthropic-agentic/customer-support-agent
 ./setup.sh
 
-# 3. Fill in your Bedrock token in .env.local
-# AWS_BEARER_TOKEN_BEDROCK=<your-token>
+# 3. Open VSCode, then open the workshop directory and edit the API Key in .env.local
 
-# 4. Start the app
+
+
+# 4. Start the app from the terminal
+cd customer-support-agent
 npm run dev
 ```
 
@@ -82,21 +86,6 @@ const response = await anthropic.messages.create({
 // → Claude returns JSON text
 // → Zod validates the shape
 // → frontend renders each field
-```
-
-### Why JSON instead of plain text?
-
-The frontend renders `response` as the chat bubble, turns `suggested_questions` into clickable buttons, and reads `redirect_to_agent` to show the handoff button. Plain text cannot drive this. The Zod schema is the contract — if Claude returns the wrong shape, the error is caught at the boundary, not silently in the UI.
-
-```typescript
-const responseSchema = z.object({
-  thinking: z.string(),           // internal reasoning — shown in the debug panel
-  response: z.string(),           // what the customer reads
-  user_mood: z.enum([...]),       // drives the sentiment indicator
-  suggested_questions: z.array(z.string()),
-  redirect_to_agent: z.object({ should_redirect: z.boolean() }),
-  debug: z.object({ context_used: z.boolean() }),
-});
 ```
 
 ### Explore the system prompt

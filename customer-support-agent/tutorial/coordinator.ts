@@ -216,8 +216,11 @@ export async function runCoordinator(
         .filter((b: any) => b.type === "text")
         .map((b: any) => b.text)
         .join(" ");
+      const parsed = parseJSON(text);
       console.log("[Coordinator] done");
-      return { response: responseSchema.parse(parseJSON(text)), escalation };
+      if (process.env.DEBUG_THINKING) console.log("[Coordinator] reasoning:", JSON.stringify({ thinking: parsed.thinking }, null, 2));
+      console.log("[Coordinator] tokens:", JSON.stringify({ input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens }, null, 2));
+      return { response: responseSchema.parse(parsed), escalation };
     }
 
     currentMessages.push({ role: "assistant", content: res.content });
