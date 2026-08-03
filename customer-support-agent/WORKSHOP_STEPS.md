@@ -346,6 +346,29 @@ The coordinator stub (Step 1) calls Claude directly with no tools. Now you'll re
 import { runCustomerDataAgent } from "./customer-data";
 ```
 
+**Update `SYSTEM_PROMPT`** — replace the `IMPORTANT RULES` block with:
+
+```
+AGENTS AVAILABLE:
+- delegate_customer_data: identity, account balances, transaction history
+
+DELEGATION RULES:
+1. As soon as the customer provides name + phone, delegate immediately.
+2. Always pass the customer's name, phone, and full question to the delegate.
+3. Synthesize the agent response into a single coherent reply for the customer.
+
+IMPORTANT: Always respond as valid JSON:
+{
+  "thinking": "which agents you called and why",
+  "response": "your response to the customer",
+  "user_mood": "positive|neutral|negative|curious|frustrated|confused",
+  "suggested_questions": ["Question 1?", "Question 2?"],
+  "redirect_to_agent": { "should_redirect": false },
+  "debug": { "context_used": true },
+  "orchestration": { "agents_called": ["customer_data"] }
+}
+```
+
 **Replace the `runCoordinator` function** with:
 
 ```typescript
@@ -357,7 +380,7 @@ export async function runCoordinator(
   console.log("[Coordinator] started");
 
   const SPECIALIST_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
-
+  
   const tools: any[] = [
     {
       name: "delegate_customer_data",
@@ -423,28 +446,7 @@ export async function runCoordinator(
 }
 ```
 
-**Update `SYSTEM_PROMPT`** — replace the `IMPORTANT RULES` block with:
 
-```
-AGENTS AVAILABLE:
-- delegate_customer_data: identity, account balances, transaction history
-
-DELEGATION RULES:
-1. As soon as the customer provides name + phone, delegate immediately.
-2. Always pass the customer's name, phone, and full question to the delegate.
-3. Synthesize the agent response into a single coherent reply for the customer.
-
-IMPORTANT: Always respond as valid JSON:
-{
-  "thinking": "which agents you called and why",
-  "response": "your response to the customer",
-  "user_mood": "positive|neutral|negative|curious|frustrated|confused",
-  "suggested_questions": ["Question 1?", "Question 2?"],
-  "redirect_to_agent": { "should_redirect": false },
-  "debug": { "context_used": true },
-  "orchestration": { "agents_called": ["customer_data"] }
-}
-```
 
 ---
 
@@ -588,6 +590,20 @@ export async function runBillingAgent(
 import { runBillingAgent } from "./billing";
 ```
 
+
+**Add to the system prompt:**
+
+```
+- delegate_billing: bills, invoices, payment due dates
+```
+
+**Add the delegation rule** — billing needs the `customer_id` already resolved:
+
+```
+4. For billing tasks: first call delegate_customer_data to resolve the customer_id,
+   then pass that customer_id when calling delegate_billing.
+```
+
 **Add the tool:**
 
 ```typescript
@@ -603,19 +619,6 @@ import { runBillingAgent } from "./billing";
 },
 ```
 
-
-**Add to the system prompt:**
-
-```
-- delegate_billing: bills, invoices, payment due dates
-```
-
-**Add the delegation rule** — billing needs the `customer_id` already resolved:
-
-```
-4. For billing tasks: first call delegate_customer_data to resolve the customer_id,
-   then pass that customer_id when calling delegate_billing.
-```
 
 **Add the case:**
 
@@ -646,6 +649,8 @@ Terminal:
 ```
 
 Two agents called, one synthesized response.
+
+![Billing Data Agent](tutorial/images/ws-anthropic-014.png)
 
 ---
 
