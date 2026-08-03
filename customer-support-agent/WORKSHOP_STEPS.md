@@ -9,14 +9,18 @@ Build a production-style customer support system — from a single API call to a
 ## Before you start
 
 # Open your terminal and run the commands bellow
-!(tutorial/images/ws-anthropic-001.png)
+![Open Terminal](tutorial/images/ws-anthropic-001.png)
 
 ```bash
 # 1. Clone the project into your Downloads directory
 cd Downloads
-!(tutorial/images/ws-anthropic-002.png)
 git clone https://github.com/thiagosouza-ciandt/workshop-anthropic-agentic
+```
+![Access Directory](tutorial/images/ws-anthropic-002.png)
+![Clone repository](tutorial/images/ws-anthropic-003.png)
 
+
+```bash
 # 2. Run setup — installs deps, starts Docker infra, creates .env.local
 cd workshop-anthropic-agentic/customer-support-agent
 ./setup.sh
