@@ -34,8 +34,10 @@ cd workshop-anthropic-agentic/customer-support-agent
 ### Open VSCode, then open the workshop directory and edit the API Key in .env.local (File > Open Folder)
 
 ![Open VS Code](tutorial/images/ws-anthropic-005.png)
-![Open Code Directori](tutorial/images/ws-anthropic-006.png)
-![Edit API Key](tutorial/images/ws-anthropic-007.png)
+![Open Code Folder](tutorial/images/ws-anthropic-006.png)
+![Select Folder](tutorial/images/ws-anthropic-007.png)
+![Edit API Key](tutorial/images/ws-anthropic-008.png)
+
 
 ```bash
 # 4. Start the app from the terminal
