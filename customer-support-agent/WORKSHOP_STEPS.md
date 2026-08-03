@@ -22,14 +22,16 @@ git clone https://github.com/thiagosouza-ciandt/workshop-anthropic-agentic
 
 
 ```bash
-# 2. Access the directory and run the setup script — installs deps, starts Docker infra, creates .env.local
+# 2. Access the directory and run the setup script — (installs deps, starts Docker infra, creates .env.local)
+# It may take up to 5 minutes to complete
+
 cd workshop-anthropic-agentic/customer-support-agent
 ./setup.sh
 ```
 ![Setup](tutorial/images/ws-anthropic-004.png)
 
 
-### Open VSCode, then open the workshop directory and edit the API Key in .env.local
+### Open VSCode, then open the workshop directory and edit the API Key in .env.local (File > Open Folder)
 
 ![Open VS Code](tutorial/images/ws-anthropic-005.png)
 ![Open Code Directori](tutorial/images/ws-anthropic-006.png)
