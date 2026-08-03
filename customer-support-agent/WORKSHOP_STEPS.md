@@ -8,9 +8,13 @@ Build a production-style customer support system — from a single API call to a
 
 ## Before you start
 
+# Open your terminal and run the commands bellow
+!(tutorial/images/ws-anthropic-001.png)
+
 ```bash
 # 1. Clone the project into your Downloads directory
 cd Downloads
+!(tutorial/images/ws-anthropic-002.png)
 git clone https://github.com/thiagosouza-ciandt/workshop-anthropic-agentic
 
 # 2. Run setup — installs deps, starts Docker infra, creates .env.local
@@ -309,50 +313,114 @@ export async function runCustomerDataAgent(
 
 ---
 
-### 3.2 — Add `delegate_customer_data` to the Coordinator
+### 3.2 — Upgrade the Coordinator to delegate to the specialist
 
-Open `app/lib/agents/coordinator.ts`. The coordinator stub calls Claude directly. Now you'll make it delegate identity and account queries to the specialist.
+The coordinator stub (Step 1) calls Claude directly with no tools. Now you'll replace `runCoordinator` with a version that has a tool-calling loop and delegates to the customer data specialist.
 
-**Add the import** at the top:
+**Add the import** at the top of `app/lib/agents/coordinator.ts`:
 
 ```typescript
 import { runCustomerDataAgent } from "./customer-data";
 ```
 
-**Add the tool** inside the `tools` array:
+**Replace the `runCoordinator` function** with:
 
 ```typescript
-{
-  name: "delegate_customer_data",
-  description:
-    "Delegate to the customer data specialist. Use for: identity verification, account balances, transaction history.",
-  input_schema: {
-    type: "object" as const,
-    properties: {
-      task: { type: "string", description: "Full task including customer name, phone, and question" },
+export async function runCoordinator(
+  anthropic: AnthropicBedrock,
+  model: string,
+  messages: any[],
+): Promise<CoordinatorResult> {
+  console.log("[Coordinator] started");
+
+  const SPECIALIST_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
+
+  const tools: any[] = [
+    {
+      name: "delegate_customer_data",
+      description:
+        "Delegate to the customer data specialist. Use for: identity verification, account balances, transaction history.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          task: { type: "string", description: "Full task including customer name, phone, and question" },
+        },
+        required: ["task"],
+      },
     },
-    required: ["task"],
-  },
-},
+  ];
+
+  let escalation: EscalationInput | null = null;
+
+  const executor = async (name: string, input: any): Promise<string> => {
+    switch (name) {
+      case "delegate_customer_data":
+        return runCustomerDataAgent(anthropic, SPECIALIST_MODEL, input.task);
+      default:
+        return JSON.stringify({ error: `Unknown agent: ${name}` });
+    }
+  };
+
+  const currentMessages = [...messages];
+
+  while (true) {
+    const res = await anthropic.messages.create({
+      model,
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      tools,
+      messages: currentMessages,
+    });
+
+    if (res.stop_reason === "end_turn") {
+      const text = res.content
+        .filter((b: any) => b.type === "text")
+        .map((b: any) => b.text)
+        .join(" ");
+      const parsed = parseJSON(text);
+      console.log("[Coordinator] done");
+      if (process.env.DEBUG_THINKING) console.log("[Coordinator] reasoning:", JSON.stringify({ thinking: parsed.thinking }, null, 2));
+      console.log("[Coordinator] tokens:", JSON.stringify({ input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens }, null, 2));
+      return { response: responseSchema.parse(parsed), escalation };
+    }
+
+    currentMessages.push({ role: "assistant", content: res.content });
+
+    const toolBlocks = res.content.filter((b: any) => b.type === "tool_use");
+    toolBlocks.forEach((b: any) => console.log(`  [Coordinator] -> ${b.name}`));
+    const results = await Promise.all(
+      toolBlocks.map(async (block: any) => ({
+        type: "tool_result",
+        tool_use_id: block.id,
+        content: await executor(block.name, block.input),
+      }))
+    );
+    currentMessages.push({ role: "user", content: results });
+  }
+}
 ```
 
-**Add the case** inside the `executor` switch:
-
-```typescript
-case "delegate_customer_data":
-  return runCustomerDataAgent(anthropic, SPECIALIST_MODEL, input.task);
-```
-
-Where `SPECIALIST_MODEL` is defined before the executor:
-
-```typescript
-const SPECIALIST_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
-```
-
-**Update the system prompt** — add this to `AGENTS AVAILABLE`:
+**Update `SYSTEM_PROMPT`** — replace the `IMPORTANT RULES` block with:
 
 ```
+AGENTS AVAILABLE:
 - delegate_customer_data: identity, account balances, transaction history
+
+DELEGATION RULES:
+1. As soon as the customer provides name + phone, delegate immediately.
+2. Always pass the customer's name, phone, and full question to the delegate.
+3. Synthesize the agent response into a single coherent reply for the customer.
+
+IMPORTANT: Always respond as valid JSON:
+{
+  "thinking": "which agents you called and why",
+  "response": "your response to the customer",
+  "user_mood": "positive|neutral|negative|curious|frustrated|confused",
+  "suggested_questions": ["Question 1?", "Question 2?"],
+  "redirect_to_agent": { "should_redirect": false },
+  "debug": { "context_used": true },
+  "orchestration": { "agents_called": ["customer_data"] }
+}
 ```
 
 ---
@@ -377,12 +445,6 @@ Terminal output:
 ```
 
 The coordinator delegated, the specialist called the database, and Claude synthesized a real answer.
-
-### Why `validateId()` before every URL interpolation?
-
-The `customer_id` comes from the model. Claude is not malicious, but IDs from AI output should be treated as untrusted input — same as user input. `validateId()` prevents path traversal (`../../etc/passwd`) from ever reaching the URL.
-
----
 
 ---
 
@@ -516,12 +578,6 @@ import { runBillingAgent } from "./billing";
 },
 ```
 
-**Add the case:**
-
-```typescript
-case "delegate_billing":
-  return runBillingAgent(anthropic, SPECIALIST_MODEL, input.task);
-```
 
 **Add to the system prompt:**
 
@@ -532,10 +588,16 @@ case "delegate_billing":
 **Add the delegation rule** — billing needs the `customer_id` already resolved:
 
 ```
-3. For billing tasks: first call delegate_customer_data to resolve the customer_id,
+4. For billing tasks: first call delegate_customer_data to resolve the customer_id,
    then pass that customer_id when calling delegate_billing.
 ```
 
+**Add the case:**
+
+```typescript
+case "delegate_billing":
+  return runBillingAgent(anthropic, SPECIALIST_MODEL, input.task);
+```
 ---
 
 ### 4.3 — Test
@@ -572,7 +634,7 @@ Two agents called, one synthesized response.
 
 ### 5.1 — Fill in `app/lib/agents/payments.ts`
 
-The file already has the imports. Add:
+Add:
 
 ```typescript
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
@@ -721,6 +783,22 @@ export async function runPaymentsAgent(
 import { runPaymentsAgent } from "./payments";
 ```
 
+**Add to the system prompt:**
+
+```
+- delegate_payments: loan applications, credit limits
+```
+
+**Add the escalation rules:**
+
+```
+ESCALATION RULES:
+- Only escalate when: (a) loan > $500 confirmed by customer, or (b) customer explicitly
+  demands to speak with a human immediately.
+- If the payments agent signals needs_human_approval=true, ask the customer whether
+  they want to be transferred to a human agent. If they confirm → call escalate_to_human.
+```
+
 **Add the tool:**
 
 ```typescript
@@ -743,22 +821,6 @@ case "delegate_payments":
   return runPaymentsAgent(anthropic, SPECIALIST_MODEL, input.task);
 ```
 
-**Add to the system prompt:**
-
-```
-- delegate_payments: loan applications, credit limits
-```
-
-**Add the escalation rules:**
-
-```
-ESCALATION RULES:
-- Only escalate when: (a) loan > $500 confirmed by customer, or (b) customer explicitly
-  demands to speak with a human immediately.
-- If the payments agent signals needs_human_approval=true, ask the customer whether
-  they want to be transferred to a human agent. If they confirm → call escalate_to_human.
-```
-
 ---
 
 ### 5.3 — Test
@@ -768,14 +830,6 @@ Send:
 ```
 I want a $200 loan. Bob Smith, +1-555-0102
 ```
-
-Auto-approved (≤ $500). Then try:
-
-```
-I need an $800 loan. Carol Martinez, +1-555-0103
-```
-
-Pending — above $500, requires human approval.
 
 ---
 
@@ -819,6 +873,13 @@ The server exposes the four files in `docs/`:
 import { searchDocs } from "./mcp-docs";
 ```
 
+
+**Add to the system prompt:**
+
+```
+- search_docs: CorpBank internal policy documents (rates, fees, eligibility, products)
+```
+
 **Add the tool:**
 
 ```typescript
@@ -843,11 +904,6 @@ case "search_docs":
   return searchDocs(input.query);
 ```
 
-**Add to the system prompt:**
-
-```
-- search_docs: CorpBank internal policy documents (rates, fees, eligibility, products)
-```
 
 ---
 
@@ -856,9 +912,9 @@ case "search_docs":
 Send without identifying yourself — these are policy questions:
 
 ```
-What's the interest rate for a $1,000 loan?
-How can I increase my credit limit?
-What accounts does CorpBank offer?
+- What's the interest rate for a $1,000 loan?
+- How can I increase my credit limit?
+- What accounts does CorpBank offer?
 ```
 
 Terminal:
@@ -868,8 +924,6 @@ Terminal:
   [Coordinator] -> search_docs
 [Coordinator] done
 ```
-
-To swap the data source, change only `MCP_DOCS_URL` in `.env.local` and the Docker image in `infra/docker-compose.yml`. The agent code does not change.
 
 ---
 

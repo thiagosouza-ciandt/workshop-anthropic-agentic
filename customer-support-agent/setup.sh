@@ -147,14 +147,20 @@ fi
 
 # ── 5. Docker infrastructure ──────────────────────────────────────────────────
 info "Starting Docker containers (CorpDB + MCP docs)..."
-export DOCS_PATH="$SCRIPT_DIR/docs"
-if [[ ! -d "$DOCS_PATH" ]]; then
-  error "docs/ folder not found at $DOCS_PATH — make sure you cloned the full repository."
+if [[ ! -d "$SCRIPT_DIR/docs" ]]; then
+  error "docs/ folder not found — make sure you cloned the full repository."
 fi
-info "Docs path: $DOCS_PATH"
+# Copy docs to a fixed shared path so any user can edit and the container picks up changes
+SHARED_DOCS="/opt/corpbank-docs"
+sudo mkdir -p "$SHARED_DOCS"
+sudo cp -r "$SCRIPT_DIR/docs/." "$SHARED_DOCS/"
+if ! getent group workshop &>/dev/null; then sudo groupadd workshop; fi
+sudo chown -R root:workshop "$SHARED_DOCS"
+sudo find "$SHARED_DOCS" -type d -exec chmod 775 {} \;   # dirs: group traversal + write
+sudo find "$SHARED_DOCS" -type f -exec chmod 664 {} \;   # files: no execute bit
+info "Docs copied to $SHARED_DOCS — users in group 'workshop' can edit files to update MCP content"
 cd "$SCRIPT_DIR/infra"
-# --force-recreate ensures any existing container picks up the correct DOCS_PATH volume
-DOCS_PATH="$DOCS_PATH" $COMPOSE up -d --build --force-recreate
+$COMPOSE up -d --build --force-recreate
 cd "$SCRIPT_DIR"
 
 # Verify the docs volume mounted correctly inside the container

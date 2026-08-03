@@ -22,7 +22,7 @@ services:
     ports:
       - "8082:8082"
     volumes:
-      - ${DOCS_PATH:-../docs}:/docs:ro
+      - /opt/corpbank-docs:/docs:ro
     command: >
       --stdio "npx -y @modelcontextprotocol/server-filesystem /docs"
       --port 8082
