@@ -860,6 +860,7 @@ Send:
 ```
 I want a $200 loan. David Lee	+1-555-0104
 ```
+![Payments Agent](tutorial/images/ws-anthropic-015.png)
 
 ---
 
@@ -954,7 +955,7 @@ Terminal:
   [Coordinator] -> search_docs
 [Coordinator] done
 ```
-
+![MCP](tutorial/images/ws-anthropic-016.png)
 ---
 
 ---
@@ -1051,6 +1052,10 @@ From the backoffice:
 - Type a message → Carol sees it in real time
 - Click **Approve** → Carol receives the decision with next-step suggestions
 - Or click **Return to AI agent** → conversation hands back to Claude
+
+![Escalation 1](tutorial/images/ws-anthropic-017.png)
+![Escalation 2](tutorial/images/ws-anthropic-018.png)
+![Escalation 3](tutorial/images/ws-anthropic-019.png)
 
 ---
 
