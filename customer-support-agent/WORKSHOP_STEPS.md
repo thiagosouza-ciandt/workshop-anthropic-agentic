@@ -39,6 +39,10 @@ cd workshop-anthropic-agentic/customer-support-agent
 ![Edit API Key](tutorial/images/ws-anthropic-008.png)
 
 
+### Run the project on terminal (Stand alone terminal or VSCode terminal)
+![run the project](tutorial/images/ws-anthropic-009.png)
+
+
 ```bash
 # 4. Start the app from the terminal
 cd customer-support-agent
