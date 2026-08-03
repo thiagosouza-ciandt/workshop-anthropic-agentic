@@ -8,7 +8,7 @@ Build a production-style customer support system — from a single API call to a
 
 ## Before you start
 
-# Open your terminal and run the commands bellow
+### Open your terminal and run the commands bellow
 ![Open Terminal](tutorial/images/ws-anthropic-001.png)
 
 ```bash
