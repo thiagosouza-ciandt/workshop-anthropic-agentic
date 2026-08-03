@@ -471,7 +471,7 @@ Terminal output:
 
 The coordinator delegated, the specialist called the database, and Claude synthesized a real answer.
 
-![Custumer Data Agent](tutorial/images/ws-anthropic-013.png)
+![Customer Data Agent](tutorial/images/ws-anthropic-011.png)
 
 ---
 
@@ -620,7 +620,7 @@ import { runBillingAgent } from "./billing";
 ```
 
 
-**Add the case:**
+Add the case to the function **executor**:
 
 ```typescript
 case "delegate_billing":
@@ -819,7 +819,7 @@ import { runPaymentsAgent } from "./payments";
 - delegate_payments: loan applications, credit limits
 ```
 
-**Add the escalation rules:**
+**Add the escalation rules:** After delegation rules
 
 ```
 ESCALATION RULES:
@@ -858,7 +858,7 @@ case "delegate_payments":
 Send:
 
 ```
-I want a $200 loan. Bob Smith, +1-555-0102
+I want a $200 loan. David Lee	+1-555-0104
 ```
 
 ---
@@ -873,10 +873,10 @@ I want a $200 loan. Bob Smith, +1-555-0102
 
 MCP (Model Context Protocol) is an open standard for connecting AI agents to external data sources. The value: you change the server, not the agent code.
 
-```
+
 Without MCP:  Agent → custom fetch() → your API → data
 With MCP:     Agent → MCP client → MCP server → any source
-```
+
 
 ### The server is already running
 
@@ -1007,17 +1007,7 @@ case "escalate_to_human":
   return JSON.stringify({ escalated: true });
 ```
 
-Declare the variable before the executor:
 
-```typescript
-let escalation: EscalationInput | null = null;
-```
-
-Return it alongside the response:
-
-```typescript
-return { response: responseSchema.parse(parseJSON(text)), escalation };
-```
 
 ### The full flow
 
