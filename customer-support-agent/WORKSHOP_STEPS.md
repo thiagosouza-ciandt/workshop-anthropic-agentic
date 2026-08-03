@@ -50,6 +50,7 @@ npm run dev
 ```
 
 App runs at `http://localhost:3000`. No restarts needed — Next.js hot-reloads on every save.
+![web browser](tutorial/images/ws-anthropic-010.png)
 
 ---
 
@@ -93,6 +94,7 @@ Hi, I want to check my balance. My name is Alice Johnson.
 ```
 
 The agent responds but says it cannot access account data — correct, it has no tools yet.
+![web browser](tutorial/images/ws-anthropic-011.png)
 
 ---
 
