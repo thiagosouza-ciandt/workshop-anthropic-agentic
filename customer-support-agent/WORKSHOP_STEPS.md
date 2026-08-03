@@ -16,19 +16,26 @@ Build a production-style customer support system — from a single API call to a
 cd Downloads
 git clone https://github.com/thiagosouza-ciandt/workshop-anthropic-agentic
 ```
+
 ![Access Directory](tutorial/images/ws-anthropic-002.png)
 ![Clone repository](tutorial/images/ws-anthropic-003.png)
 
 
 ```bash
-# 2. Run setup — installs deps, starts Docker infra, creates .env.local
+# 2. Access the directory and run the setup script — installs deps, starts Docker infra, creates .env.local
 cd workshop-anthropic-agentic/customer-support-agent
 ./setup.sh
+```
+![Setup](tutorial/images/ws-anthropic-004.png)
 
-# 3. Open VSCode, then open the workshop directory and edit the API Key in .env.local
 
+### Open VSCode, then open the workshop directory and edit the API Key in .env.local
 
+![Open VS Code](tutorial/images/ws-anthropic-005.png)
+![Open Code Directori](tutorial/images/ws-anthropic-006.png)
+![Edit API Key](tutorial/images/ws-anthropic-007.png)
 
+```bash
 # 4. Start the app from the terminal
 cd customer-support-agent
 npm run dev
