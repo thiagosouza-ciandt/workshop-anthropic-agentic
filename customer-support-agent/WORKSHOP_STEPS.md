@@ -116,6 +116,8 @@ const response = await anthropic.messages.create({
 ### Explore the system prompt
 
 Open `app/lib/agents/coordinator.ts` and find `SYSTEM_PROMPT`.
+![System prompt](tutorial/images/ws-anthropic-012.png)
+
 
 **Try it:**
 
@@ -466,6 +468,9 @@ Terminal output:
 ```
 
 The coordinator delegated, the specialist called the database, and Claude synthesized a real answer.
+
+Open `app/lib/agents/coordinator.ts` and find `SYSTEM_PROMPT`.
+![Custumer Data Agent](tutorial/images/ws-anthropic-013.png)
 
 ---
 
