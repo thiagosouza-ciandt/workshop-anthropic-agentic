@@ -347,12 +347,10 @@ export async function runCustomerDataAgent(
   }
 }
 ```
-
+The agent is all set! Next step: Upgrade the coordinator
 ---
 
 ### 3.2 — Upgrade the Coordinator to delegate to the specialist
-
-The coordinator stub (Step 1) calls Claude directly with no tools. Now you'll replace `runCoordinator` with a version that has a tool-calling loop and delegates to the customer data specialist.
 
 **Add the import** at the top of `app/lib/agents/coordinator.ts`:
 
@@ -360,7 +358,7 @@ The coordinator stub (Step 1) calls Claude directly with no tools. Now you'll re
 import { runCustomerDataAgent } from "./customer-data";
 ```
 
-**Update `SYSTEM_PROMPT`** — replace the `IMPORTANT RULES` block with:
+**Update `SYSTEM_PROMPT`** — After the first block, replace the `IMPORTANT RULES` block with:
 
 ```
 AGENTS AVAILABLE:
@@ -382,7 +380,7 @@ IMPORTANT: Always respond as valid JSON:
   "orchestration": { "agents_called": ["customer_data"] }
 }
 ```
-
+The coordinator stub (Step 1) calls Claude directly with no tools. Now you'll replace `runCoordinator` with a version that has a tool-calling loop and delegates to the customer data specialist.
 **Replace the `runCoordinator` function** with:
 
 ```typescript
