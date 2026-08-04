@@ -264,7 +264,9 @@ const ID_RE = /^[a-zA-Z0-9_-]+$/;
 function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
-
+```
+- Add the function that runs the tools
+```typescript
 async function executeTool(name: string, input: any): Promise<string> {
   try {
     switch (name) {
