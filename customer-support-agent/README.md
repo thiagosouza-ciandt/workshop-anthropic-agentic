@@ -52,9 +52,6 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 | Real-time | Server-Sent Events (SSE) |
 | Validation | Zod |
 
-### Lab Case - Customer Support Multi-agents
-
-![Customer Support Case](tutorial/customer-support-workshop-case.png)
 
 ---
 
@@ -75,40 +72,7 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 
 ## 3. Architecture
 
-```
-Customer browser  ─────────────────────────────────► localhost:3000/
-                                                          │
-                                                    Next.js API
-                                                    /api/chat
-                                                    (route.ts)
-                                                          │
-                                              ┌───────────▼──────────────┐
-                                              │       Coordinator         │
-                                              │    (Claude via Bedrock)   │
-                                              │                           │
-                                              │  Delegates to:            │
-                                              │  • CustomerData Agent     │
-                                              │  • Billing Agent          │
-                                              │  • Payments Agent         │
-                                              │  • search_docs (MCP)      │
-                                              │  • escalate_to_human      │
-                                              └──┬──────┬──────┬──────────┘
-                                                 │      │      │
-                                          CustomerData  │   Payments
-                                             Agent    Billing  Agent
-                                               │      Agent     │
-                                               └──────┬─────────┘
-                                                      │
-                                               CorpDB API          MCP server
-                                              (SQLite REST)       (docs/ folder)
-                                             localhost:3001      localhost:8082/sse
-                                                                    (Docker SSE)
-
-Backoffice browser ─────────────────────────► localhost:3000/backoffice
-                        SSE (/api/stream)          │
-                        ◄──────────────────────────┘
-                        real-time handoffs, decisions, customer messages
-```
+![Customer Support Case](tutorial/images/customer-support-workshop-case.png)
 
 ### Pages
 
