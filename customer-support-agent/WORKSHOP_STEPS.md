@@ -689,6 +689,7 @@ Two agents called, one synthesized response.
 
 Add:
 
+- Database Connection REST
 ```typescript
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
@@ -707,7 +708,9 @@ async function dbPost(path: string, body: object) {
   if (!res.ok) throw new Error(`CorpDB ${res.status}: ${path}`);
   return res.json();
 }
-
+```
+- Add tools
+```typescript
 const tools: any[] = [
   {
     name: "get_credit",
@@ -733,13 +736,17 @@ const tools: any[] = [
     },
   },
 ];
-
+```
+- Add Regex for ID validation
+```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
 
 function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
-
+```
+- Add the function that runs the tools
+```typescript
 async function executeTool(name: string, input: any): Promise<string> {
   try {
     switch (name) {
@@ -759,7 +766,9 @@ async function executeTool(name: string, input: any): Promise<string> {
     return JSON.stringify({ error: err.message });
   }
 }
-
+```
+- Add the system prompt
+```typescript
 const SYSTEM_PROMPT = `You are the loans and credit specialist for CorpBank.
 Use tools to check credit and process loans — never make up numbers.
 The coordinator always passes the customer_id resolved from name + phone — use it directly.
@@ -785,7 +794,9 @@ Always include a structured data block in your response:
 { "customer_id": "...", "loan_id": "...", "needs_human_approval": true/false }
 The coordinator needs customer_id to create handoffs — always include it.
 Reply in English.`;
-
+```
+- Export the function that runs the agent
+```typescript
 export async function runPaymentsAgent(
   anthropic: AnthropicBedrock,
   model: string,
@@ -919,7 +930,7 @@ The server exposes the four files in `docs/`:
 | `faq.md` | Common questions and answers |
 | `products.md` | Account types and support channels |
 
-### `mcp-docs.ts` is already created — add it to the Coordinator
+### `mcp-docs.ts` is already created — Now, upgrade the Coordinator
 
 **Add the import:**
 
