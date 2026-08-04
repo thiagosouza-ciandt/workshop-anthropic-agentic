@@ -194,6 +194,8 @@ In this step you wire up the first specialist: the Customer Data agent, which ha
 
 The file already has the imports. Add the following code:
 
+- Database Connection REST
+
 ```typescript
 // database connection
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
@@ -213,7 +215,10 @@ async function dbPost(path: string, body: object) {
   if (!res.ok) throw new Error(`CorpDB ${res.status}: ${path}`);
   return res.json();
 }
+```
 
+- Tools Definition
+```typescript
 // tools definition
 const tools: any[] = [
   {
@@ -251,7 +256,9 @@ const tools: any[] = [
     },
   },
 ];
-
+```
+- Regex for ID validation
+```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
 
 function validateId(id: string, field: string): void {
@@ -279,7 +286,9 @@ async function executeTool(name: string, input: any): Promise<string> {
     return JSON.stringify({ error: err.message });
   }
 }
-
+```
+- Add System Prompt
+```typescript
 const SYSTEM_PROMPT = `You are the customer accounts specialist for CorpBank.
 Use tools to fetch real customer data — never make up numbers.
 
@@ -293,7 +302,10 @@ TOOLS:
 - get_accounts: all account balances (requires customer_id from identify_customer)
 - get_transactions: recent statement for an account
 Be concise and professional. Reply in English.`;
+```
 
+- Finish with the function that runs the agent
+```typescript
 export async function runCustomerDataAgent(
   anthropic: AnthropicBedrock,
   model: string,
