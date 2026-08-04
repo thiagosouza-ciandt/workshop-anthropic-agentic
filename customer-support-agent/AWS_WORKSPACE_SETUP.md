@@ -1,6 +1,5 @@
 # CI&T — Anthropic Multi-Agent Workshop
 ## AWS Workspace Setup
----
 This is a guide to setup your AWS Workspace environment, a virtual machine where you can run your workshop. Check requirements and details here: https://clients.amazonworkspaces.com/
 
 ## Step by Step
