@@ -36,6 +36,8 @@ cd workshop-anthropic-agentic/customer-support-agent
 ![Open VS Code](tutorial/images/ws-anthropic-005.png)
 ![Open Code Folder](tutorial/images/ws-anthropic-006.png)
 ![Select Folder](tutorial/images/ws-anthropic-007.png)
+
+**The instructor will provide a temporary API KEY**
 ![Edit API Key](tutorial/images/ws-anthropic-008.png)
 
 
