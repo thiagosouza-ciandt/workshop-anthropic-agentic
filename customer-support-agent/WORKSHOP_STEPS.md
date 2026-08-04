@@ -7,6 +7,7 @@ Build a production-style customer support system — from a single API call to a
 ---
 
 ## Before you start
+If you workshop will be using AWS Workspace environment, make sure to [follow this steps before you continue](AWS_WORKSPACE_SETUP.md)
 
 ### Open your terminal and run the commands bellow
 ![Open Terminal](tutorial/images/ws-anthropic-001.png)
