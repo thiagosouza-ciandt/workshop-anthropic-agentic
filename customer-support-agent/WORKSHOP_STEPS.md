@@ -79,8 +79,6 @@ Customer message
 
 ---
 
----
-
 # Step 1 — Basic Agent
 
 **~15 min** · Single API call · Structured JSON output · Ground rules
@@ -129,8 +127,6 @@ The system prompt is the agent's contract. Ground rules, persona, and constraint
 
 ---
 
----
-
 # Step 2 — Multi-turn Conversation
 
 **~15 min** · No code changes · Understanding statelessness
@@ -173,8 +169,6 @@ The frontend sends the **entire conversation array** on every request. Claude re
 | Server holds no state | Backend scales horizontally without session affinity |
 | History controls behavior | You can inject context mid-conversation |
 | Context window is the ceiling | Very long conversations eventually hit the model's max |
-
----
 
 ---
 
@@ -347,7 +341,6 @@ export async function runCustomerDataAgent(
   }
 }
 ```
-
 ---
 
 ### 3.2 — Upgrade the Coordinator to delegate to the specialist
@@ -457,7 +450,6 @@ export async function runCoordinator(
   }
 }
 ```
-
 
 ---
 
@@ -675,7 +667,6 @@ Two agents called, one synthesized response.
 
 ![Billing Data Agent](tutorial/images/ws-anthropic-014.png)
 
----
 
 ---
 
@@ -898,8 +889,6 @@ I want a $200 loan. David Lee	+1-555-0104
 
 ---
 
----
-
 # Step 6 — MCP (Document Search)
 
 **~20 min** · Standard integration protocol · Policy documents
@@ -990,8 +979,6 @@ Terminal:
 [Coordinator] done
 ```
 ![MCP](tutorial/images/ws-anthropic-016.png)
----
-
 ---
 
 # Step 7 — Human-in-the-Loop
@@ -1090,8 +1077,6 @@ From the backoffice:
 ![Escalation 1](tutorial/images/ws-anthropic-017.png)
 ![Escalation 2](tutorial/images/ws-anthropic-018.png)
 ![Escalation 3](tutorial/images/ws-anthropic-019.png)
-
----
 
 ---
 
