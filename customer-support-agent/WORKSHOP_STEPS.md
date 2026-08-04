@@ -194,7 +194,7 @@ In this step you wire up the first specialist: the Customer Data agent, which ha
 
 The file already has the imports. Add the following code:
 
-- Database Connection REST
+**Database Connection REST**
 
 ```typescript
 // database connection
@@ -217,7 +217,7 @@ async function dbPost(path: string, body: object) {
 }
 ```
 
-- Tools Definition
+**Tools Definition**
 ```typescript
 // tools definition
 const tools: any[] = [
@@ -257,7 +257,7 @@ const tools: any[] = [
   },
 ];
 ```
-- Regex for ID validation
+**Regex for ID validation**
 ```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
 
@@ -265,7 +265,7 @@ function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
 ```
-- Add the function that runs the tools
+**Add the function that runs the tools**
 ```typescript
 async function executeTool(name: string, input: any): Promise<string> {
   try {
@@ -289,7 +289,7 @@ async function executeTool(name: string, input: any): Promise<string> {
   }
 }
 ```
-- Add System Prompt
+**Add System Prompt**
 ```typescript
 const SYSTEM_PROMPT = `You are the customer accounts specialist for CorpBank.
 Use tools to fetch real customer data — never make up numbers.
@@ -306,7 +306,7 @@ TOOLS:
 Be concise and professional. Reply in English.`;
 ```
 
-- Finish exporting the function that runs the agent
+**Finish exporting the function that runs the agent**
 ```typescript
 export async function runCustomerDataAgent(
   anthropic: AnthropicBedrock,
@@ -496,7 +496,7 @@ The coordinator delegated, the specialist called the database, and Claude synthe
 
 The file already has the imports. Add:
 
-- Database Connection REST
+**Database Connection REST**
 ```typescript
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
@@ -507,7 +507,7 @@ async function db(path: string) {
 }
 ```
 
-- Add tools
+**Add tools**
 ```typescript
 const tools: any[] = [
   {
@@ -528,7 +528,7 @@ const tools: any[] = [
   },
 ];
 ```
-- Add REGEX for ID validation
+**Add REGEX for ID validation**
 ```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
 
@@ -536,7 +536,7 @@ function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
 ```
-- Add the function that runs the tools
+**Add the function that runs the tools**
 ```typescript
 async function executeTool(name: string, input: any): Promise<string> {
   try {
@@ -554,14 +554,14 @@ async function executeTool(name: string, input: any): Promise<string> {
   }
 }
 ```
-- Add system prompt
+**Add system prompt**
 ```typescript
 const SYSTEM_PROMPT = `You are the billing specialist for CorpBank.
 Use tools to fetch real billing data — never make up numbers.
 - get_bills: list bills (pass paid=false for open/overdue only)
 Highlight due dates and overdue amounts clearly. Reply in English.`;
 ```
-- Export the function that runs the agent
+**Export the function that runs the agent**
 ```typescript
 export async function runBillingAgent(
   anthropic: AnthropicBedrock,
@@ -689,7 +689,7 @@ Two agents called, one synthesized response.
 
 Add:
 
-- Database Connection REST
+**Database Connection REST**
 ```typescript
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
@@ -709,7 +709,7 @@ async function dbPost(path: string, body: object) {
   return res.json();
 }
 ```
-- Add tools
+**Add tools**
 ```typescript
 const tools: any[] = [
   {
@@ -737,7 +737,7 @@ const tools: any[] = [
   },
 ];
 ```
-- Add Regex for ID validation
+**Add Regex for ID validation**
 ```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
 
@@ -767,7 +767,7 @@ async function executeTool(name: string, input: any): Promise<string> {
   }
 }
 ```
-- Add the system prompt
+**Add the system prompt**
 ```typescript
 const SYSTEM_PROMPT = `You are the loans and credit specialist for CorpBank.
 Use tools to check credit and process loans — never make up numbers.
@@ -795,7 +795,7 @@ Always include a structured data block in your response:
 The coordinator needs customer_id to create handoffs — always include it.
 Reply in English.`;
 ```
-- Export the function that runs the agent
+**Export the function that runs the agent**
 ```typescript
 export async function runPaymentsAgent(
   anthropic: AnthropicBedrock,
