@@ -1,5 +1,5 @@
 # CI&T × Anthropic — Multi-Agent Workshop
-## CorpBank Customer Support Agent
+## Customer Support Agent
 
 ---
 
