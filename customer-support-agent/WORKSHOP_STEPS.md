@@ -306,7 +306,7 @@ TOOLS:
 Be concise and professional. Reply in English.`;
 ```
 
-- Finish with the function that runs the agent
+- Finish exporting the function that runs the agent
 ```typescript
 export async function runCustomerDataAgent(
   anthropic: AnthropicBedrock,
@@ -347,7 +347,7 @@ export async function runCustomerDataAgent(
   }
 }
 ```
-The agent is all set! Next step: Upgrade the coordinator
+
 ---
 
 ### 3.2 — Upgrade the Coordinator to delegate to the specialist
@@ -459,7 +459,6 @@ export async function runCoordinator(
 ```
 
 
-
 ---
 
 ### 3.3 — Test
@@ -497,6 +496,7 @@ The coordinator delegated, the specialist called the database, and Claude synthe
 
 The file already has the imports. Add:
 
+- Database Connection REST
 ```typescript
 const CORPDB_URL = process.env.CORPDB_URL ?? "http://localhost:3001";
 
@@ -505,7 +505,10 @@ async function db(path: string) {
   if (!res.ok) throw new Error(`CorpDB ${res.status}: ${path}`);
   return res.json();
 }
+```
 
+- Add tools
+```typescript
 const tools: any[] = [
   {
     name: "get_bills",
@@ -524,13 +527,17 @@ const tools: any[] = [
     },
   },
 ];
-
+```
+- Add REGEX for ID validation
+```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
 
 function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
-
+```
+- Add the function that runs the tools
+```typescript
 async function executeTool(name: string, input: any): Promise<string> {
   try {
     switch (name) {
@@ -546,12 +553,16 @@ async function executeTool(name: string, input: any): Promise<string> {
     return JSON.stringify({ error: err.message });
   }
 }
-
+```
+- Add system prompt
+```typescript
 const SYSTEM_PROMPT = `You are the billing specialist for CorpBank.
 Use tools to fetch real billing data — never make up numbers.
 - get_bills: list bills (pass paid=false for open/overdue only)
 Highlight due dates and overdue amounts clearly. Reply in English.`;
-
+```
+- Export the function that runs the agent
+```typescript
 export async function runBillingAgent(
   anthropic: AnthropicBedrock,
   model: string,
