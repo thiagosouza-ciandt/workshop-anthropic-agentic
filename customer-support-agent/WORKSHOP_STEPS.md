@@ -9,7 +9,7 @@ Build a production-style customer support system — from a single API call to a
 ## Before you start
 If your workshop will be using AWS Workspace environment, make sure to [follow this steps before you continue](AWS_WORKSPACE_SETUP.md)
 
-### Open your terminal and run the commands bellow
+### Open your terminal and run the commands below
 ![Open Terminal](tutorial/images/ws-anthropic-001.png)
 
 ```bash
@@ -183,7 +183,7 @@ The frontend sends the **entire conversation array** on every request. Claude re
 
 A single agent that knows everything is hard to tune. Improving loan logic can accidentally change how balances are reported. Specialist agents solve this: each one has its own system prompt, its own tools, and can be changed independently.
 
-In this step you wire up the first specialist: the Customer Data agent, which handles identity verification and account queries.
+In this step, you wire up the first specialist: the Customer Data agent, which handles identity verification and account queries.
 
 ---
 
@@ -374,7 +374,7 @@ IMPORTANT: Always respond as valid JSON:
   "redirect_to_agent": { "should_redirect": false },
   "debug": { "context_used": true },
   "orchestration": { "agents_called": ["customer_data"] }
-}
+}`;
 ```
 The coordinator stub (Step 1) calls Claude directly with no tools. Now you'll replace `runCoordinator` with a version that has a tool-calling loop and delegates to the customer data specialist.
 **Replace the `runCoordinator` function** with:
@@ -666,7 +666,7 @@ Terminal:
 [Coordinator] done
 ```
 
-Two agents called, one synthesized response.
+Two agents were called, one synthesized response.
 
 ![Billing Data Agent](tutorial/images/ws-anthropic-014.png)
 
