@@ -1105,11 +1105,14 @@ In the customer chat:
 I need an $800 loan. Carol Martinez, +1-555-0103
 ```
 &nbsp;  
+![Escalation 1](tutorial/images/ws-anthropic-017.png)  
+&nbsp;  
 The agent registers the loan (pending — above $500), then asks if Carol wants to be transferred. Reply:
 
 ```
 Yes, please transfer me to a human agent.
 ```
+
 &nbsp;  
 Now, open another window on the browser, side by side:  
 &nbsp;  
@@ -1122,8 +1125,7 @@ From the backoffice:
 - Type a message → Carol sees it in real time
 - Click **Approve** → Carol receives the decision with next-step suggestions
 - Or click **Return to AI agent** → conversation hands back to Claude  
-&nbsp;  
-![Escalation 1](tutorial/images/ws-anthropic-017.png)  
+
 &nbsp;  
 ![Escalation 2](tutorial/images/ws-anthropic-018.png)  
 &nbsp;  
