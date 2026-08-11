@@ -674,7 +674,7 @@ Two agents were called, one synthesized response.
 
 ---
 
-# Step 5 — Payments Agent
+![Payments Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-05.png)
 
 **~15 min** · Third specialist · Credit limits and loan requests
 
@@ -893,7 +893,7 @@ I want a $200 loan. David Lee	+1-555-0104
 
 ---
 
-# Step 6 — MCP (Document Search)
+![MCP](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-06.png)
 
 **~20 min** · Standard integration protocol · Policy documents
 
@@ -985,7 +985,7 @@ Terminal:
 ![MCP](tutorial/images/ws-anthropic-016.png)
 ---
 
-# Step 7 — Human-in-the-Loop
+![Human-in-the-loop](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-07.png)
 
 **~20 min** · Real-time handoff · SSE
 
