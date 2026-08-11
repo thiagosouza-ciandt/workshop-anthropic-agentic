@@ -1,4 +1,4 @@
-# CI&T × Anthropic — Multi-Agent Workshop
+![Workshop Cover](CI&T---Anthropic-Workshop---cover.png)
 ## Customer Support Agent
 
 ---
