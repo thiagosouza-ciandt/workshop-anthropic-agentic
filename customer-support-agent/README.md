@@ -1,4 +1,4 @@
-![Title](./CI&T---Anthropic-Workshop---cover.png)
+![Title](./Assets/CI&T---Anthropic-Workshop---cover.png)
 ## Customer Support Agent
 
 ---
