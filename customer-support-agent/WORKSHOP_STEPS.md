@@ -95,7 +95,7 @@ Hi, I want to check my balance. My name is Alice Johnson.
 ```
 
 The agent responds but says it cannot access account data — correct, it has no tools yet.
-![web browser](tutorial/images/ws-anthropic-011.png)
+![web browser](tutorial/images/ws-anthropic-020.png)
 
 ---
 
@@ -132,7 +132,7 @@ The system prompt is the agent's contract. Ground rules, persona, and constraint
 
 # Step 2 — Multi-turn Conversation
 
-**~15 min** · No code changes · Understanding statelessness
+**~5 min** · No code changes · Understanding statelessness
 
 ---
 
