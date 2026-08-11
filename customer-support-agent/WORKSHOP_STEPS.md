@@ -1094,10 +1094,10 @@ Operator sends a message
 &nbsp;  
 ### Test
 
-Open two browser windows side by side:
+Open the customer browser window:
 
 - `http://localhost:3000` — customer
-- `http://localhost:3000/backoffice` — human agent
+
 &nbsp;  
 In the customer chat:
 &nbsp;  
@@ -1111,8 +1111,13 @@ The agent registers the loan (pending — above $500), then asks if Carol wants 
 Yes, please transfer me to a human agent.
 ```
 &nbsp;  
-In the backoffice: Carol's card appears instantly with the full conversation, agent reasoning, and credit summary.
+Now, open another window on the browser, side by side:  
+&nbsp;  
+- `http://localhost:3000/backoffice` — human agent  
+&nbsp;  
 
+In the backoffice: Carol's card appears instantly with the full conversation, agent reasoning, and credit summary.  
+&nbsp;  
 From the backoffice:
 - Type a message → Carol sees it in real time
 - Click **Approve** → Carol receives the decision with next-step suggestions
