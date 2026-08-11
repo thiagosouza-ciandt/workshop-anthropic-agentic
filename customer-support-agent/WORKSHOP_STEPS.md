@@ -917,40 +917,41 @@ case "delegate_payments":
 ```
 &nbsp;  
 ---
-
+&nbsp;  
 ### 5.3 — Test
 
 Send:
-
+&nbsp;  
 ```
 I want a $200 loan. David Lee	+1-555-0104
 ```
-![Payments Agent](tutorial/images/ws-anthropic-015.png)
+&nbsp;  
+![Payments Agent](tutorial/images/ws-anthropic-015.png)  
+&nbsp;  
 
 ---
-
-![MCP](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-06.png)
-
-**~20 min** · Standard integration protocol · Policy documents
-
+&nbsp;  
+![MCP](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-06.png)  
+&nbsp;  
+**~20 min** · Standard integration protocol · Policy documents  
+&nbsp;  
 ---
-
+&nbsp;  
 MCP (Model Context Protocol) is an open standard for connecting AI agents to external data sources. The value: you change the server, not the agent code.
-
-
+&nbsp;  
 Without MCP:  Agent → custom fetch() → your API → data
 With MCP:     Agent → MCP client → MCP server → any source
-
-
+&nbsp;  
 ### The server is already running
 
 `setup.sh` started two Docker containers:
 - `corpdb-api` on port `3001` — SQLite REST API
 - `corpbank-mcp-docs` on port `8082` — MCP filesystem server
 
-The MCP container wraps `@modelcontextprotocol/server-filesystem` and exposes it as HTTP SSE at `http://localhost:8082/sse`.
-
-The server exposes the four files in `docs/`:
+The MCP container wraps `@modelcontextprotocol/server-filesystem` and exposes it as HTTP SSE at `http://localhost:8082/sse`.  
+&nbsp;  
+The server exposes the four files in `docs/`:  
+&nbsp;  
 
 | File | Content |
 |---|---|
@@ -959,21 +960,22 @@ The server exposes the four files in `docs/`:
 | `faq.md` | Common questions and answers |
 | `products.md` | Account types and support channels |
 
-### `mcp-docs.ts` is already created — Now, upgrade the Coordinator
+&nbsp;  
 
+### `mcp-docs.ts` is already created — Now, upgrade the Coordinator
+&nbsp;  
 **Add the import:**
 
 ```typescript
 import { searchDocs } from "./mcp-docs";
 ```
-
-
+&nbsp;  
 **Add to the system prompt:**
 
 ```
 - search_docs: CorpBank internal policy documents (rates, fees, eligibility, products)
 ```
-
+&nbsp;  
 **Add the tool:**
 
 ```typescript
@@ -990,17 +992,17 @@ import { searchDocs } from "./mcp-docs";
   },
 },
 ```
-
+&nbsp;  
 **Add the case:**
 
 ```typescript
 case "search_docs":
   return searchDocs(input.query);
 ```
-
+&nbsp;  
 
 ---
-
+&nbsp;  
 ### Test
 
 Send without identifying yourself — these are policy questions:
@@ -1010,7 +1012,7 @@ Send without identifying yourself — these are policy questions:
 - How can I increase my credit limit?
 - What accounts does CorpBank offer?
 ```
-
+&nbsp;  
 Terminal:
 
 ```
@@ -1018,18 +1020,21 @@ Terminal:
   [Coordinator] -> search_docs
 [Coordinator] done
 ```
-![MCP](tutorial/images/ws-anthropic-016.png)
+&nbsp;  
+&nbsp;  
+![MCP](tutorial/images/ws-anthropic-016.png)  
+&nbsp;  
 
 ---
-
-![Human-in-the-loop](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-07.png)
-
-**~20 min** · Real-time handoff · SSE
-
+&nbsp;  
+![Human-in-the-loop](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-07.png)  
+&nbsp;  
+**~20 min** · Real-time handoff · SSE  
+&nbsp;  
 ---
-
+&nbsp;  
 The handoff infrastructure is already in the repo. SSE (Server-Sent Events) is a native browser protocol for the server to push events without polling — no WebSocket library needed.
-
+&nbsp;  
 ### Existing files — no changes needed
 
 | File | Purpose |
@@ -1038,9 +1043,9 @@ The handoff infrastructure is already in the repo. SSE (Server-Sent Events) is a
 | `app/api/stream/route.ts` | SSE endpoint — frontend subscribes here |
 | `app/api/handoff/route.ts` | Creates handoffs, receives backoffice messages |
 | `app/backoffice/page.tsx` | Human agent UI |
-
+&nbsp;  
 ### Add `escalate_to_human` to the Coordinator
-
+&nbsp;  
 **Add the tool:**
 
 ```typescript
@@ -1061,7 +1066,7 @@ The handoff infrastructure is already in the repo. SSE (Server-Sent Events) is a
   },
 },
 ```
-
+&nbsp;  
 **Add the case** — the coordinator only signals intent; `route.ts` handles the DB write and SSE publish:
 
 ```typescript
@@ -1069,9 +1074,7 @@ case "escalate_to_human":
   escalation = input as EscalationInput;
   return JSON.stringify({ escalated: true });
 ```
-
-
-
+&nbsp;  
 ### The full flow
 
 ```
@@ -1088,40 +1091,42 @@ Operator sends a message
   → Customer chat has EventSource on /api/stream?channel=<conversationId>
   → Customer sees the message in real time
 ```
-
+&nbsp;  
 ### Test
 
 Open two browser windows side by side:
 
 - `http://localhost:3000` — customer
 - `http://localhost:3000/backoffice` — human agent
-
+&nbsp;  
 In the customer chat:
-
+&nbsp;  
 ```
 I need an $800 loan. Carol Martinez, +1-555-0103
 ```
-
+&nbsp;  
 The agent registers the loan (pending — above $500), then asks if Carol wants to be transferred. Reply:
 
 ```
 Yes, please transfer me to a human agent.
 ```
-
+&nbsp;  
 In the backoffice: Carol's card appears instantly with the full conversation, agent reasoning, and credit summary.
 
 From the backoffice:
 - Type a message → Carol sees it in real time
 - Click **Approve** → Carol receives the decision with next-step suggestions
-- Or click **Return to AI agent** → conversation hands back to Claude
-
-![Escalation 1](tutorial/images/ws-anthropic-017.png)
-![Escalation 2](tutorial/images/ws-anthropic-018.png)
-![Escalation 3](tutorial/images/ws-anthropic-019.png)
-
+- Or click **Return to AI agent** → conversation hands back to Claude  
+&nbsp;  
+![Escalation 1](tutorial/images/ws-anthropic-017.png)  
+&nbsp;  
+![Escalation 2](tutorial/images/ws-anthropic-018.png)  
+&nbsp;  
+![Escalation 3](tutorial/images/ws-anthropic-019.png)  
+&nbsp;  
 ---
-
-# What you built
+&nbsp;  
+### What you built  
 
 ```
 route.ts  (HTTP layer — infra only)
@@ -1136,10 +1141,10 @@ route.ts  (HTTP layer — infra only)
         └── escalate_to_human       → signals route.ts
               route.ts: POST /handoffs → publish("*", handoff_created) → backoffice
 ```
-
+&nbsp;  
 ---
-
-## Key principles
+&nbsp;  
+### Key principles  
 
 | Decision | Why |
 |---|---|
