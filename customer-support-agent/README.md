@@ -1,9 +1,10 @@
-![Workshop Cover](CI&T---Anthropic-Workshop---cover.png)
+![Title](./CI&T---Anthropic-Workshop---cover.png)
+
 ## Customer Support Agent
 
 ---
 
-> **Workshop focus:** Everything you need to build is in **`app/lib/agents/`** — a handful of files you create during the sessions. The frontend, database, Docker infrastructure, and backoffice UI are **already set up and running** — they exist to make the agent feel real, not to be studied.
+> **Workshop focus:** Everything you need to build is in `app/lib/agents/` — a handful of files you create during the sessions. The frontend, database, Docker infrastructure, and backoffice UI are **already set up and running** — they exist to make the agent feel real, not to be studied.
 >
 > The sections on Architecture, Tools, and the Agentic Loop are **informational reference**. The hands-on work is in [`WORKSHOP_STEPS.md`](WORKSHOP_STEPS.md).
 
@@ -26,7 +27,7 @@
 
 ---
 
-![Project Overview](/tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-01.png)
+![Project Overview](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-01.png)
 
 CorpBank is a fictional bank customer support system built to demonstrate **multi-agent AI patterns** using Claude via Amazon Bedrock. A customer chats with an AI agent that can query real data, handle loan requests, search internal policy documents, and transfer the conversation to a human agent in real time.
 
@@ -55,7 +56,7 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 
 ---
 
-## 2. Schedule
+![Schedule](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-02.png)
 
 | Step | Duration | What you build |
 |---|---|---|
@@ -70,7 +71,7 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 
 ---
 
-## 3. Architecture
+![Architeture](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-03.png)
 
 ![Customer Support Case](tutorial/images/customer-support-workshop-case.png)
 
@@ -84,7 +85,7 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 
 ---
 
-## 4. Coordinator Pattern
+![Coordinator Pattern](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-04.png)
 
 The **Coordinator** is a Claude agent that acts as the single entry point for customer requests. Instead of handling everything itself, it:
 
@@ -118,7 +119,7 @@ escalate_to_human       → signals route.ts to create handoff + publish SSE eve
 
 ---
 
-## 5. Tools
+![Tools](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-05.png)
 
 Tools are functions you expose to Claude. Claude reads the `name` and `description` and decides when to call them. You receive the call, execute the function, and return the result — Claude then continues.
 
@@ -168,7 +169,7 @@ The Payments agent checks `get_credit` before processing any loan:
 
 ---
 
-## 6. The Agentic Loop
+![The Agentic Loop](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-06.png)
 
 The agentic loop is the `while (true)` that keeps Claude working until it finishes. Every specialist agent uses this pattern.
 
@@ -201,7 +202,7 @@ Without the loop, Claude requests a tool but your code never sends the result ba
 
 ---
 
-## 7. Escalate to Human (Human-in-the-Loop)
+![Escalate to Human](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-07.png)
 
 When a loan requires human approval or a customer demands it, the Coordinator transfers the full conversation to a human agent (a **handoff**).
 
@@ -233,7 +234,7 @@ Every handoff includes:
 
 ---
 
-## 8. MCP — Internal Document Search
+![MCP](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-08.png)
 
 **Model Context Protocol (MCP)** is an open standard for connecting AI agents to external data sources without writing custom integrations for each one.
 
@@ -277,7 +278,7 @@ await client.callTool({ name: "read_text_file", arguments: { path: "/docs/loan-p
 
 ---
 
-## 9. Prompt Attack Prevention
+![Prompt Attack Prevention](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-09.png)
 
 | Mitigation | Implementation |
 |---|---|
@@ -289,7 +290,7 @@ await client.callTool({ name: "read_text_file", arguments: { path: "/docs/loan-p
 
 ---
 
-## 10. Running the Project
+![Running the Project](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-10.png)
 
 ### Prerequisites
 
@@ -352,7 +353,7 @@ curl -s http://localhost:8082/sse     # MCP docs server — returns SSE stream
 
 ---
 
-## 11. Database & API Contract
+![Database & API Contract](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-11.png)
 
 SQLite REST API (Docker, port 3001). Full contract: [`infra/API_CONTRACT.md`](infra/API_CONTRACT.md)
 
@@ -384,7 +385,7 @@ PATCH /handoffs/:id/resolve
 
 ---
 
-## 12. File Reference
+![File Reference](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-12.png)
 
 ```
 customer-support-agent/
