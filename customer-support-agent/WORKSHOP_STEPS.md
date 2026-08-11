@@ -1,4 +1,4 @@
-# CorpBank — Multi-Agent Workshop
+![Title](./CI&T---Anthropic-Workshop---cover.png)
 
 Build a production-style customer support system — from a single API call to a full multi-agent architecture with real data, document search, and live human handoff.
 
@@ -6,7 +6,8 @@ Build a production-style customer support system — from a single API call to a
 
 ---
 
-## Before you start
+![Before you start](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-before.png)
+
 If your workshop will be using AWS Workspace environment, make sure to [follow this steps before you continue](AWS_WORKSPACE_SETUP.md)
 
 ### Open your terminal and run the commands below
@@ -82,7 +83,7 @@ Customer message
 
 ---
 
-# Step 1 — Basic Agent
+![Basic Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-01.png)
 
 **~15 min** · Single API call · Structured JSON output · Ground rules
 
@@ -130,7 +131,7 @@ The system prompt is the agent's contract. Ground rules, persona, and constraint
 
 ---
 
-# Step 2 — Multi-turn Conversation
+![Multi-turn Conversation](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-02.png)
 
 **~5 min** · No code changes · Understanding statelessness
 
@@ -175,7 +176,7 @@ The frontend sends the **entire conversation array** on every request. Claude re
 
 ---
 
-# Step 3 — Customer Data Agent
+![Customer Data Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-03.png)
 
 **~20 min** · First specialist · Identity + account data · Test identification
 
@@ -481,7 +482,7 @@ The coordinator delegated, the specialist called the database, and Claude synthe
 
 ---
 
-# Step 4 — Billing Agent
+![Billing Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-04.png)
 
 **~15 min** · Second specialist · Bills and invoices
 
