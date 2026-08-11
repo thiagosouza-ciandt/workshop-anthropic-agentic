@@ -1,28 +1,35 @@
 ![Title](./CI&T---Anthropic-Workshop---cover.png)
+  
+Build a production-style customer support system — from a single API call to a full multi-agent architecture with real data, document search, and live human handoff.  
+&nbsp;
+&nbsp;
 
-Build a production-style customer support system — from a single API call to a full multi-agent architecture with real data, document search, and live human handoff.
-
-![Customer Support Case](tutorial/images/customer-support-workshop-case.png)
-
----
-
+![Customer Support Case](tutorial/images/customer-support-workshop-case.png)  
+&nbsp;  
+---  
+&nbsp;  
 ![Before you start](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-before.png)
 
 If your workshop will be using AWS Workspace environment, make sure to [follow this steps before you continue](AWS_WORKSPACE_SETUP.md)
-
-### Open your terminal and run the commands below
+&nbsp;  
+&nbsp;  
+### Open your terminal and run the commands below  
+&nbsp;  
 ![Open Terminal](tutorial/images/ws-anthropic-001.png)
 
+&nbsp;  
 ```bash
 # 1. Clone the project into your Downloads directory
 cd Downloads
 git clone https://github.com/thiagosouza-ciandt/workshop-anthropic-agentic
 ```
+&nbsp;  
 
-![Access Directory](tutorial/images/ws-anthropic-002.png)
+![Access Directory](tutorial/images/ws-anthropic-002.png)  
+&nbsp;  
 ![Clone repository](tutorial/images/ws-anthropic-003.png)
 
-
+&nbsp;  
 ```bash
 # 2. Access the directory and run the setup script — (installs deps, starts Docker infra, creates .env.local)
 # It may take up to 5 minutes to complete
@@ -30,35 +37,44 @@ git clone https://github.com/thiagosouza-ciandt/workshop-anthropic-agentic
 cd workshop-anthropic-agentic/customer-support-agent
 ./setup.sh
 ```
+&nbsp;  
+
 ![Setup](tutorial/images/ws-anthropic-004.png)
 
-
+&nbsp;  
 ### Open VSCode, then open the workshop directory and edit the API Key in .env.local (File > Open Folder)
+&nbsp;  
 
-![Open VS Code](tutorial/images/ws-anthropic-005.png)
-![Open Code Folder](tutorial/images/ws-anthropic-006.png)
-![Select Folder](tutorial/images/ws-anthropic-007.png)
+![Open VS Code](tutorial/images/ws-anthropic-005.png)  
+![Open Code Folder](tutorial/images/ws-anthropic-006.png)  
+![Select Folder](tutorial/images/ws-anthropic-007.png)  
 
-**The instructor will provide a temporary API KEY**
+&nbsp;  
+### The instructor will provide a temporary API KEY  
+&nbsp;  
 ![Edit API Key](tutorial/images/ws-anthropic-008.png)
 
 
 ### Run the project on terminal (Stand alone terminal or VSCode terminal)
 ![run the project](tutorial/images/ws-anthropic-009.png)
 
-
+&nbsp;  
 ```bash
 # 4. Start the app from the terminal
 cd customer-support-agent
 npm run dev
 ```
+&nbsp;  
 
-App runs at `http://localhost:3000`. No restarts needed — Next.js hot-reloads on every save.
-![web browser](tutorial/images/ws-anthropic-010.png)
-
+App runs at `http://localhost:3000`. No restarts needed — Next.js hot-reloads on every save.  
+&nbsp;  
+![web browser](tutorial/images/ws-anthropic-010.png)  
+&nbsp;  
+&nbsp;  
 ---
-
-## What you will build
+&nbsp;  
+# What you will build  
+&nbsp;  
 
 ```
 Customer message
@@ -69,10 +85,11 @@ Customer message
         ├── MCP (docs search)            ← internal policy documents
         └── escalate_to_human            ← live handoff to backoffice
 ```
+&nbsp;  
 
 ---
-
-## Test customers
+&nbsp;  
+### Test customers  
 
 | Name | Phone | Credit limit |
 |---|---|---|
@@ -81,12 +98,13 @@ Customer message
 | Carol Martinez | +1-555-0103 | $10,000 |
 | David Lee | +1-555-0104 | $500 |
 
+&nbsp;  
 ---
-
-![Basic Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-01.png)
-
-**~15 min** · Single API call · Structured JSON output · Ground rules
-
+&nbsp;  
+![Basic Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-01.png)  
+&nbsp;  
+**~15 min** · Single API call · Structured JSON output · Ground rules  
+&nbsp;  
 ---
 
 Open `http://localhost:3000` and send:
@@ -95,13 +113,13 @@ Open `http://localhost:3000` and send:
 Hi, I want to check my balance. My name is Alice Johnson.
 ```
 
-The agent responds but says it cannot access account data — correct, it has no tools yet.
-![web browser](tutorial/images/ws-anthropic-020.png)
-
+The agent responds but says it cannot access account data — correct, it has no tools yet.  
+&nbsp;  
+![web browser](tutorial/images/ws-anthropic-020.png)  
+&nbsp;  
 ---
-
-### How it works
-
+### How it works  
+&nbsp;  
 Every message from the frontend calls `POST /api/chat`. The handler calls the coordinator, which makes **one call** to Claude and returns structured JSON:
 
 ```typescript
@@ -114,27 +132,27 @@ const response = await anthropic.messages.create({
 // → Zod validates the shape
 // → frontend renders each field
 ```
+&nbsp;  
+### Explore the system prompt  
 
-### Explore the system prompt
-
-Open `app/lib/agents/coordinator.ts` and find `SYSTEM_PROMPT`.
+Open `app/lib/agents/coordinator.ts` and find `SYSTEM_PROMPT`.  
 ![System prompt](tutorial/images/ws-anthropic-012.png)
 
-
+&nbsp;  
 **Try it:**
 
 1. Change the bank name from `CorpBank` to anything. Save — the agent introduces itself with the new name immediately.
 2. Add a rule like `Always respond in Portuguese.` — see it take effect instantly.
-3. Add a guardrail: `Never discuss competitors or other banks.` — test it in the chat.
+3. Add a guardrail: `Never discuss competitors or other banks.` — test it in the chat.  
 
-The system prompt is the agent's contract. Ground rules, persona, and constraints all live here.
-
+#### The system prompt is the agent's contract. Ground rules, persona, and constraints all live here.  
+&nbsp;  
 ---
-
-![Multi-turn Conversation](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-02.png)
-
-**~5 min** · No code changes · Understanding statelessness
-
+&nbsp;  
+![Multi-turn Conversation](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-02.png)  
+&nbsp;  
+**~5 min** · No code changes · Understanding statelessness  
+&nbsp;  
 ---
 
 Try this conversation:
@@ -149,9 +167,10 @@ Claude remembers your name across all three turns — with no server-side sessio
 
 ### Claude is stateless
 
-Every API call starts completely fresh. There is no conversation object on the server. Between requests, Claude forgets everything.
-
-**So how does it remember Alice?**
+Every API call starts completely fresh. There is no conversation object on the server. Between requests, Claude forgets everything.  
+&nbsp;  
+**So how does it remember Alice?**  
+&nbsp;  
 
 Open `components/ChatArea.tsx` around line 551:
 
@@ -162,35 +181,39 @@ body: JSON.stringify({
   conversationId,
 }),
 ```
+&nbsp;  
+The frontend sends the **entire conversation array** on every request. Claude reads from the beginning on every call. The `messages[]` array is the only memory.  
+&nbsp;    
 
-The frontend sends the **entire conversation array** on every request. Claude reads from the beginning on every call. The `messages[]` array is the only memory.
-
-### What this means in practice
-
+### What this means in practice  
 | Consequence | Impact |
 |---|---|
 | Tokens grow with each turn | Longer conversations cost more |
 | Server holds no state | Backend scales horizontally without session affinity |
 | History controls behavior | You can inject context mid-conversation |
-| Context window is the ceiling | Very long conversations eventually hit the model's max |
+| Context window is the ceiling | Very long conversations eventually hit the model's max |  
 
+&nbsp;  
 ---
-
-![Customer Data Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-03.png)
-
-**~20 min** · First specialist · Identity + account data · Test identification
-
+&nbsp;  
+![Customer Data Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-03.png)  
+&nbsp;  
+**~20 min** · First specialist · Identity + account data · Test identification  
+&nbsp;  
 ---
+&nbsp;  
 
 A single agent that knows everything is hard to tune. Improving loan logic can accidentally change how balances are reported. Specialist agents solve this: each one has its own system prompt, its own tools, and can be changed independently.
 
 In this step, you wire up the first specialist: the Customer Data agent, which handles identity verification and account queries.
 
+&nbsp;  
 ---
-
+&nbsp;  
 ### 3.1 — Fill in `app/lib/agents/customer-data.ts`
 
-The file already has the imports. Add the following code:
+The file already has the imports. Add the following code:  
+&nbsp;  
 
 **Database Connection REST**
 
@@ -214,7 +237,7 @@ async function dbPost(path: string, body: object) {
   return res.json();
 }
 ```
-
+&nbsp;  
 **Tools Definition**
 ```typescript
 // tools definition
@@ -255,6 +278,7 @@ const tools: any[] = [
   },
 ];
 ```
+&nbsp;  
 **Regex for ID validation**
 ```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -263,6 +287,7 @@ function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
 ```
+&nbsp;  
 **Add the function that runs the tools**
 ```typescript
 async function executeTool(name: string, input: any): Promise<string> {
@@ -287,6 +312,7 @@ async function executeTool(name: string, input: any): Promise<string> {
   }
 }
 ```
+&nbsp;  
 **Add System Prompt**
 ```typescript
 const SYSTEM_PROMPT = `You are the customer accounts specialist for CorpBank.
@@ -303,7 +329,7 @@ TOOLS:
 - get_transactions: recent statement for an account
 Be concise and professional. Reply in English.`;
 ```
-
+&nbsp;  
 **Finish exporting the function that runs the agent**
 ```typescript
 export async function runCustomerDataAgent(
@@ -346,7 +372,7 @@ export async function runCustomerDataAgent(
 }
 ```
 ---
-
+&nbsp;  
 ### 3.2 — Upgrade the Coordinator to delegate to the specialist
 
 **Add the import** at the top of `app/lib/agents/coordinator.ts`:
@@ -354,7 +380,7 @@ export async function runCustomerDataAgent(
 ```typescript
 import { runCustomerDataAgent } from "./customer-data";
 ```
-
+&nbsp;  
 **Update `SYSTEM_PROMPT`** — After the first block, replace the `IMPORTANT RULES` block with:
 
 ```
@@ -377,6 +403,7 @@ IMPORTANT: Always respond as valid JSON:
   "orchestration": { "agents_called": ["customer_data"] }
 }`;
 ```
+&nbsp;  
 The coordinator stub (Step 1) calls Claude directly with no tools. Now you'll replace `runCoordinator` with a version that has a tool-calling loop and delegates to the customer data specialist.
 **Replace the `runCoordinator` function** with:
 
@@ -454,17 +481,17 @@ export async function runCoordinator(
   }
 }
 ```
-
+&nbsp;  
 ---
 
-### 3.3 — Test
-
+### 3.3 — Test  
+&nbsp;  
 Send:
 
 ```
 What's my balance? Alice Johnson, +1-555-0101
 ```
-
+&nbsp;  
 Terminal output:
 
 ```
@@ -475,19 +502,19 @@ Terminal output:
   [CustomerData] tool: get_accounts
 [Coordinator] done
 ```
-
+&nbsp;  
 The coordinator delegated, the specialist called the database, and Claude synthesized a real answer.
 
-![Customer Data Agent](tutorial/images/ws-anthropic-011.png)
-
+![Customer Data Agent](tutorial/images/ws-anthropic-011.png)  
+&nbsp;  
 ---
-
-![Billing Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-04.png)
-
-**~15 min** · Second specialist · Bills and invoices
-
+&nbsp;  
+![Billing Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-04.png)  
+&nbsp;  
+**~15 min** · Second specialist · Bills and invoices  
+&nbsp;  
 ---
-
+&nbsp;  
 ### 4.1 — Fill in `app/lib/agents/billing.ts`
 
 The file already has the imports. Add:
@@ -502,7 +529,7 @@ async function db(path: string) {
   return res.json();
 }
 ```
-
+&nbsp;  
 **Add tools**
 ```typescript
 const tools: any[] = [
@@ -524,6 +551,7 @@ const tools: any[] = [
   },
 ];
 ```
+&nbsp;  
 **Add REGEX for ID validation**
 ```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -532,6 +560,7 @@ function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
 ```
+&nbsp;  
 **Add the function that runs the tools**
 ```typescript
 async function executeTool(name: string, input: any): Promise<string> {
@@ -550,6 +579,7 @@ async function executeTool(name: string, input: any): Promise<string> {
   }
 }
 ```
+&nbsp;  
 **Add system prompt**
 ```typescript
 const SYSTEM_PROMPT = `You are the billing specialist for CorpBank.
@@ -557,6 +587,7 @@ Use tools to fetch real billing data — never make up numbers.
 - get_bills: list bills (pass paid=false for open/overdue only)
 Highlight due dates and overdue amounts clearly. Reply in English.`;
 ```
+&nbsp;  
 **Export the function that runs the agent**
 ```typescript
 export async function runBillingAgent(
@@ -598,31 +629,30 @@ export async function runBillingAgent(
   }
 }
 ```
-
+&nbsp;  
 ---
-
+&nbsp;  
 ### 4.2 — Add `delegate_billing` to the Coordinator
-
+&nbsp;  
 **Add the import:**
 
 ```typescript
 import { runBillingAgent } from "./billing";
 ```
-
-
+&nbsp;  
 **Add to the system prompt:**
 
 ```
 - delegate_billing: bills, invoices, payment due dates
 ```
-
+&nbsp;  
 **Add the delegation rule** — billing needs the `customer_id` already resolved:
 
 ```
 4. For billing tasks: first call delegate_customer_data to resolve the customer_id,
    then pass that customer_id when calling delegate_billing.
 ```
-
+&nbsp;  
 **Add the tool:**
 
 ```typescript
@@ -637,24 +667,24 @@ import { runBillingAgent } from "./billing";
   },
 },
 ```
-
-
+&nbsp;  
 Add the case to the function **executor**:
 
 ```typescript
 case "delegate_billing":
   return runBillingAgent(anthropic, SPECIALIST_MODEL, input.task);
 ```
+&nbsp;  
 ---
-
+&nbsp;  
 ### 4.3 — Test
-
+&nbsp;  
 Send:
 
 ```
 What's my balance and any open bills? Alice Johnson, +1-555-0101
 ```
-
+&nbsp;  
 Terminal:
 
 ```
@@ -666,20 +696,20 @@ Terminal:
   [Billing] tool: get_bills
 [Coordinator] done
 ```
-
+&nbsp;  
 Two agents were called, one synthesized response.
 
 ![Billing Data Agent](tutorial/images/ws-anthropic-014.png)
 
-
+&nbsp;  
 ---
-
-![Payments Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-05.png)
-
-**~15 min** · Third specialist · Credit limits and loan requests
-
+&nbsp;  
+![Payments Agent](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-05.png)  
+&nbsp;  
+**~15 min** · Third specialist · Credit limits and loan requests  
+&nbsp;  
 ---
-
+&nbsp;  
 ### 5.1 — Fill in `app/lib/agents/payments.ts`
 
 Add:
@@ -704,6 +734,7 @@ async function dbPost(path: string, body: object) {
   return res.json();
 }
 ```
+&nbsp;  
 **Add tools**
 ```typescript
 const tools: any[] = [
@@ -732,6 +763,7 @@ const tools: any[] = [
   },
 ];
 ```
+&nbsp;  
 **Add Regex for ID validation**
 ```typescript
 const ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -740,7 +772,9 @@ function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
 ```
-- Add the function that runs the tools
+&nbsp;  
+**Add the function that runs the tools**
+
 ```typescript
 async function executeTool(name: string, input: any): Promise<string> {
   try {
@@ -762,6 +796,7 @@ async function executeTool(name: string, input: any): Promise<string> {
   }
 }
 ```
+&nbsp;  
 **Add the system prompt**
 ```typescript
 const SYSTEM_PROMPT = `You are the loans and credit specialist for CorpBank.
@@ -790,6 +825,7 @@ Always include a structured data block in your response:
 The coordinator needs customer_id to create handoffs — always include it.
 Reply in English.`;
 ```
+&nbsp;  
 **Export the function that runs the agent**
 ```typescript
 export async function runPaymentsAgent(
@@ -831,9 +867,9 @@ export async function runPaymentsAgent(
   }
 }
 ```
-
+&nbsp;  
 ---
-
+&nbsp;  
 ### 5.2 — Add `delegate_payments` to the Coordinator
 
 **Add the import:**
@@ -841,13 +877,13 @@ export async function runPaymentsAgent(
 ```typescript
 import { runPaymentsAgent } from "./payments";
 ```
-
+&nbsp;  
 **Add to the system prompt:**
 
 ```
 - delegate_payments: loan applications, credit limits
 ```
-
+&nbsp;  
 **Add the escalation rules:** After delegation rules
 
 ```
@@ -857,7 +893,7 @@ ESCALATION RULES:
 - If the payments agent signals needs_human_approval=true, ask the customer whether
   they want to be transferred to a human agent. If they confirm → call escalate_to_human.
 ```
-
+&nbsp;  
 **Add the tool:**
 
 ```typescript
@@ -872,14 +908,14 @@ ESCALATION RULES:
   },
 },
 ```
-
+&nbsp;  
 **Add the case:**
 
 ```typescript
 case "delegate_payments":
   return runPaymentsAgent(anthropic, SPECIALIST_MODEL, input.task);
 ```
-
+&nbsp;  
 ---
 
 ### 5.3 — Test
@@ -983,6 +1019,7 @@ Terminal:
 [Coordinator] done
 ```
 ![MCP](tutorial/images/ws-anthropic-016.png)
+
 ---
 
 ![Human-in-the-loop](./tutorial/images/workshop-steps-titles/CI&T---Anthropic-Workshop---titulos-07.png)
