@@ -3,7 +3,7 @@
 
 ---
 
-> **Workshop focus:** Everything you need to build is in `app/lib/agents/` — a handful of files you create during the sessions. The frontend, database, Docker infrastructure, and backoffice UI are **already set up and running** — they exist to make the agent feel real, not to be studied.
+> **Workshop focus:** Everything you need to build is in **`app/lib/agents/`** — a handful of files you create during the sessions. The frontend, database, Docker infrastructure, and backoffice UI are **already set up and running** — they exist to make the agent feel real, not to be studied.
 >
 > The sections on Architecture, Tools, and the Agentic Loop are **informational reference**. The hands-on work is in [`WORKSHOP_STEPS.md`](WORKSHOP_STEPS.md).
 
@@ -26,7 +26,7 @@
 
 ---
 
-## 1. Project Overview
+![Project Overview](/tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-01.png)
 
 CorpBank is a fictional bank customer support system built to demonstrate **multi-agent AI patterns** using Claude via Amazon Bedrock. A customer chats with an AI agent that can query real data, handle loan requests, search internal policy documents, and transfer the conversation to a human agent in real time.
 
