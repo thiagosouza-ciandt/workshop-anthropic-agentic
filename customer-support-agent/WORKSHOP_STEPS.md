@@ -75,7 +75,8 @@ App runs at `http://localhost:3000`. No restarts needed — Next.js hot-reloads 
 &nbsp;  
 # What you will build  
 &nbsp;  
-
+![What you will build](tutorial/images/what-you-will-build.png)  
+&nbsp;  
 ```
 Customer message
   └── Coordinator                        ← decides who handles what
