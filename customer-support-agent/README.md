@@ -73,8 +73,7 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 
 ![Architeture](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-03.png)  
 &nbsp;  
-![Customer Support Case](tutorial/images/customer-support-workshop-case.png)  
-&nbsp;  
+
 ---
 &nbsp;  
 ![What you will build](tutorial/images/what-you-will-build.png)  
