@@ -71,9 +71,14 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 
 ---
 
-![Architeture](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-03.png)
-
-![Customer Support Case](tutorial/images/customer-support-workshop-case.png)
+![Architeture](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-03.png)  
+&nbsp;  
+![Customer Support Case](tutorial/images/customer-support-workshop-case.png)  
+&nbsp;  
+---
+&nbsp;  
+![What you will build](tutorial/images/what-you-will-build.png)  
+&nbsp;  
 
 ### Pages
 
@@ -81,8 +86,9 @@ CorpBank is a fictional bank customer support system built to demonstrate **mult
 |---|---|---|
 | `localhost:3000` | Customer | Chat with the AI agent |
 | `localhost:3000/backoffice` | Human agent | See handoffs, chat with customer, approve/reject loans |
-| `localhost:3000/db` | Developer | CRUD interface for the database |
+| `localhost:3000/db` | Developer | CRUD interface for the database |  
 
+&nbsp;  
 ---
 
 ![Coordinator Pattern](./tutorial/images/readme-titles/readme-titles/CI&T---Anthropic-Workshop---titulos-04.png)
