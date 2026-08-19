@@ -101,7 +101,7 @@ App runs at `http://localhost:3000`. No restarts needed — Next.js hot-reloads 
 &nbsp;  
 ---
 
-Open `[http://localhost:3000](http://localhost:3000)` and send:
+Open [http://localhost:3000](http://localhost:3000) and send:
 
 ```
 Hi, I want to check my balance. My name is Alice Johnson.
