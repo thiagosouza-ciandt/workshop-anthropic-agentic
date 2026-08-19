@@ -98,7 +98,7 @@ export async function runCoordinator(
 
   const parsed = parseJSON(text);
   if (process.env.DEBUG_THINKING) console.log("[Coordinator] reasoning:", JSON.stringify({ thinking: parsed.thinking }, null, 2));
-  console.log("[Coordinator] tokens:", JSON.stringify({ input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens }, null, 2));
+  console.log(`[Coordinator] stop_reason: ${res.stop_reason} | content blocks: ${res.content?.length ?? "UNDEFINED"} | tokens in: ${res.usage?.input_tokens} out: ${res.usage?.output_tokens}`);
 
   return {
     response: responseSchema.parse(parsed),

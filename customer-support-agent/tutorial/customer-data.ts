@@ -115,6 +115,7 @@ export async function runCustomerDataAgent(
       tools,
       messages,
     });
+    console.log(`[CustomerDataAgent] stop_reason: ${res.stop_reason} | content blocks: ${res.content?.length ?? "UNDEFINED"} | tokens in: ${res.usage?.input_tokens} out: ${res.usage?.output_tokens}`);
 
     if (res.stop_reason === "end_turn") {
       return res.content

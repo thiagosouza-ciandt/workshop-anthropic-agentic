@@ -4,7 +4,7 @@ Build a production-style customer support system — from a single API call to a
 &nbsp;
 &nbsp;
 
-![Customer Support Case](tutorial/images/customer-support-workshop-case.png)  
+![Customer Support Architecture](tutorial/images/customer-support-workshop-case.png)  
 &nbsp;  
 ---  
 &nbsp;  
@@ -78,13 +78,6 @@ App runs at `http://localhost:3000`. No restarts needed — Next.js hot-reloads 
 ![What you will build](tutorial/images/what-you-will-build.png)  
 &nbsp;  
 ```
-Customer message
-  └── Coordinator                        ← decides who handles what
-        ├── CustomerData Agent           ← identity, balances, transactions
-        ├── Billing Agent                ← bills and invoices
-        ├── Payments Agent               ← credit limits and loans
-        ├── MCP (docs search)            ← internal policy documents
-        └── escalate_to_human            ← live handoff to backoffice
 ```
 &nbsp;  
 
@@ -108,7 +101,7 @@ Customer message
 &nbsp;  
 ---
 
-Open `http://localhost:3000` and send:
+Open `[http://localhost:3000](http://localhost:3000)` and send:
 
 ```
 Hi, I want to check my balance. My name is Alice Johnson.
@@ -237,6 +230,8 @@ async function dbPost(path: string, body: object) {
   if (!res.ok) throw new Error(`CorpDB ${res.status}: ${path}`);
   return res.json();
 }
+
+
 ```
 &nbsp;  
 **Tools Definition**
@@ -278,6 +273,8 @@ const tools: any[] = [
     },
   },
 ];
+
+
 ```
 &nbsp;  
 **Regex for ID validation**
@@ -287,6 +284,8 @@ const ID_RE = /^[a-zA-Z0-9_-]+$/;
 function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
+
+
 ```
 &nbsp;  
 **Add the function that runs the tools**
@@ -312,6 +311,8 @@ async function executeTool(name: string, input: any): Promise<string> {
     return JSON.stringify({ error: err.message });
   }
 }
+
+
 ```
 &nbsp;  
 **Add System Prompt**
@@ -329,6 +330,8 @@ TOOLS:
 - get_accounts: all account balances (requires customer_id from identify_customer)
 - get_transactions: recent statement for an account
 Be concise and professional. Reply in English.`;
+
+
 ```
 &nbsp;  
 **Finish exporting the function that runs the agent**
@@ -371,6 +374,8 @@ export async function runCustomerDataAgent(
     messages.push({ role: "user", content: results });
   }
 }
+
+
 ```
 ---
 &nbsp;  
@@ -403,6 +408,7 @@ IMPORTANT: Always respond as valid JSON:
   "debug": { "context_used": true },
   "orchestration": { "agents_called": ["customer_data"] }
 }`;
+
 ```
 &nbsp;  
 The coordinator stub (Step 1) calls Claude directly with no tools. Now you'll replace `runCoordinator` with a version that has a tool-calling loop and delegates to the customer data specialist.
@@ -529,6 +535,8 @@ async function db(path: string) {
   if (!res.ok) throw new Error(`CorpDB ${res.status}: ${path}`);
   return res.json();
 }
+
+
 ```
 &nbsp;  
 **Add tools**
@@ -551,6 +559,8 @@ const tools: any[] = [
     },
   },
 ];
+
+
 ```
 &nbsp;  
 **Add REGEX for ID validation**
@@ -560,6 +570,8 @@ const ID_RE = /^[a-zA-Z0-9_-]+$/;
 function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
+
+
 ```
 &nbsp;  
 **Add the function that runs the tools**
@@ -579,6 +591,8 @@ async function executeTool(name: string, input: any): Promise<string> {
     return JSON.stringify({ error: err.message });
   }
 }
+
+
 ```
 &nbsp;  
 **Add system prompt**
@@ -587,6 +601,8 @@ const SYSTEM_PROMPT = `You are the billing specialist for CorpBank.
 Use tools to fetch real billing data — never make up numbers.
 - get_bills: list bills (pass paid=false for open/overdue only)
 Highlight due dates and overdue amounts clearly. Reply in English.`;
+
+
 ```
 &nbsp;  
 **Export the function that runs the agent**
@@ -629,6 +645,7 @@ export async function runBillingAgent(
     messages.push({ role: "user", content: results });
   }
 }
+
 ```
 &nbsp;  
 ---
@@ -734,6 +751,8 @@ async function dbPost(path: string, body: object) {
   if (!res.ok) throw new Error(`CorpDB ${res.status}: ${path}`);
   return res.json();
 }
+
+
 ```
 &nbsp;  
 **Add tools**
@@ -763,6 +782,8 @@ const tools: any[] = [
     },
   },
 ];
+
+
 ```
 &nbsp;  
 **Add Regex for ID validation**
@@ -772,6 +793,8 @@ const ID_RE = /^[a-zA-Z0-9_-]+$/;
 function validateId(id: string, field: string): void {
   if (!id || !ID_RE.test(id)) throw new Error(`Invalid ${field}: ${id}`);
 }
+
+
 ```
 &nbsp;  
 **Add the function that runs the tools**
@@ -796,6 +819,8 @@ async function executeTool(name: string, input: any): Promise<string> {
     return JSON.stringify({ error: err.message });
   }
 }
+
+
 ```
 &nbsp;  
 **Add the system prompt**
@@ -825,6 +850,8 @@ Always include a structured data block in your response:
 { "customer_id": "...", "loan_id": "...", "needs_human_approval": true/false }
 The coordinator needs customer_id to create handoffs — always include it.
 Reply in English.`;
+
+
 ```
 &nbsp;  
 **Export the function that runs the agent**
